@@ -93,7 +93,7 @@ export const verifyOtp = (email, otp) => {
 // Step 3: Complete registration
 export const register = async (userData) => {
   try {
-    console.log("🔧 Register function called");
+  
     const {
       email,
       userName,
@@ -107,7 +107,7 @@ export const register = async (userData) => {
       pincode,
     } = userData;
 
-    console.log("📧 Email:", email);
+   
 
     // Validate lastName
     if (!lastName || lastName.trim() === "") {
@@ -130,25 +130,25 @@ export const register = async (userData) => {
 
     // Check OTP verification
     const record = otpStore.get(email);
-    console.log("🔍 OTP Record:", record);
+
 
     if (!record || !record.verified) {
       return { success: false, message: "Email not verified", status: 400 };
     }
 
     // Check if user already exists
-    console.log("🔎 Checking if user exists...");
+  
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return { success: false, message: "User already exists", status: 400 };
     }
 
     // Hash password
-    console.log("🔐 Hashing password...");
+  
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
-    console.log("👤 Creating new user...");
+  
     const user = new User({
       userName,
       lastName,
@@ -163,9 +163,9 @@ export const register = async (userData) => {
       role: userType, // Set role same as userType for now
     });
 
-    console.log("💾 Saving user to database...");
+   
     await user.save();
-    console.log("✅ User saved successfully!");
+
 
     otpStore.delete(email); // Clean up OTP store
 

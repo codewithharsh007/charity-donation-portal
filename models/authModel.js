@@ -62,12 +62,12 @@ const userSchema = new mongoose.Schema(
     userType: {
       type: String,
       required: [true, 'User type is required'],
-      enum: ['Donor', 'Ngo'],
+      enum: ['donor', 'ngo'],
       trim: true,
     },
     role: {
       type: String,
-      enum: ['Donor', 'Ngo', 'admin'],
+      enum: ['donor', 'ngo', 'admin'],
       default: 'donor',
     },
   },

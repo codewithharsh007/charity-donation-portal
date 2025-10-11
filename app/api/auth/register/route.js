@@ -7,11 +7,9 @@ export async function POST(request) {
     await dbConnect();
     const userData = await request.json();
 
-    console.log('📥 Register API called with:', { ...userData, password: '***' });
 
     const result = await register(userData);
 
-    console.log('📤 Register result:', result);
 
     return NextResponse.json(
       { 
