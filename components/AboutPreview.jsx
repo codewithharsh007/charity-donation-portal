@@ -47,6 +47,7 @@ export default function AboutPreview() {
               src="/img/hero.jpeg"
               alt="Mother and child"
               fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
             />
           </div>

@@ -47,6 +47,7 @@ export default function AboutPage() {
                 src="/img/hero.jpeg"
                 alt="Mother and child"
                 fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
               />
             </div>
@@ -83,6 +84,7 @@ export default function AboutPage() {
                 src="/img/aboutRandom.jpeg"
                 alt="Community support"
                 fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
               />
             </div>

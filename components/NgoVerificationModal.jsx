@@ -128,21 +128,35 @@ export default function NgoVerificationModal() {
     setShowModal(false);
   };
 
-  // Upload to Cloudinary
+  // Upload to Cloudinary via server-side endpoint
+  // We convert the file to a data URL on the client and send that to a protected server API
+  // which uses server-side Cloudinary credentials. This avoids exposing secrets and
+  // prevents 401 caused by missing/incorrect client-side credentials or signed uploads.
   const uploadToCloudinary = async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'charity_preset');
+    // helper to read file as data URL
+    const readFileAsDataURL = (f) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      });
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/auto/upload`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
+    const dataUrl = await readFileAsDataURL(file);
 
-    if (!response.ok) throw new Error('Upload failed');
+    const response = await fetch('/api/cloudinary/upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: dataUrl, filename: file.name }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Upload failed');
+    }
+
     return await response.json();
   };
 
