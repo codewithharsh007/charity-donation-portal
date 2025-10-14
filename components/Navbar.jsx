@@ -35,7 +35,10 @@ export default function Navbar() {
     };
   }, [pathname]); // Re-check when route changes
 
-
+  // Don't show navbar for admin users
+  if (user && user.role === 'admin') {
+    return null;
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-gray-900 shadow-lg">

@@ -1,6 +1,42 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function Footer() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const checkUser = () => {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      } else {
+        setUser(null);
+      }
+    };
+
+    // Check on mount
+    checkUser();
+
+    // Listen for storage changes (for multi-tab sync)
+    window.addEventListener('storage', checkUser);
+    
+    // Listen for custom login event
+    window.addEventListener('userLoggedIn', checkUser);
+
+    return () => {
+      window.removeEventListener('storage', checkUser);
+      window.removeEventListener('userLoggedIn', checkUser);
+    };
+  }, []);
+
+  // Don't show footer for admin users
+  if (user && user.role === 'admin') {
+    return null;
+  }
+
   return (
     <footer className="bg-gray-900 text-gray-300">
       <div className="container mx-auto px-4 py-10">

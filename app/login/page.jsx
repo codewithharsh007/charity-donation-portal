@@ -43,8 +43,12 @@ export default function LoginPage() {
         // Trigger custom event to update Navbar
         window.dispatchEvent(new Event('userLoggedIn'));
         
-        // Redirect to home or dashboard
-        router.push('/');
+        // Redirect based on user role
+        if (data.user.role === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/');
+        }
         router.refresh();
       } else {
         setError(data.message || 'Login failed');
