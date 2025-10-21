@@ -17,7 +17,6 @@ export default function DonorDashboardPage() {
   const [videoPreviews, setVideoPreviews] = useState([]);
   const [activeTab, setActiveTab] = useState('donations');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetchDonations();
@@ -200,9 +199,8 @@ export default function DonorDashboardPage() {
 
   const filteredDonations = donations.filter(donation => {
     const matchesSearch = donation.ngo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         donation.items?.join(' ').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || donation.status === statusFilter;
-    return matchesSearch && matchesStatus;
+                         (donation.items || []).join(' ').toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
   });
 
   const removeImage = (index) => {
@@ -239,65 +237,7 @@ export default function DonorDashboardPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Donations</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{donations.length}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-blue-50">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">₹</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm text-green-600">
-              <span>All time contributions</span>
-            </div>
-          </div>
-
-          
-
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">In Progress</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {donations.filter(d => d.status === 'pending' || d.status === 'processing').length}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-yellow-50">
-                <div className="w-8 h-8 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-lg">⟳</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm text-yellow-600">
-              <span>Active donations</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">NGOs Supported</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {new Set(donations.map(d => d.ngo)).size}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-purple-50">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-lg">🏛</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm text-purple-600">
-              <span>Organizations helped</span>
-            </div>
-          </div>
-        </div>
+        
 
         {/* Main Content */}
         <div className="bg-white rounded-2xl shadow-lg mb-8 border border-gray-100 overflow-hidden">
@@ -354,17 +294,7 @@ export default function DonorDashboardPage() {
                       </div>
                     </div>
                     
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="pending">Pending</option>
-                      <option value="processing">Processing</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                    
                   </div>
                 </div>
 
