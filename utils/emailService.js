@@ -1,5 +1,28 @@
-// utils/emailService.js
+// ...existing code...
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+
+// try loading environment file for development (checks .env.local then local.env)
+const loadLocalEnv = () => {
+  try {
+    const root = process.cwd();
+    const envLocalPath = path.join(root, '.env.local');
+    const localEnvPath = path.join(root, 'local.env');
+
+    if (fs.existsSync(envLocalPath)) {
+      dotenv.config({ path: envLocalPath });
+    } else if (fs.existsSync(localEnvPath)) {
+      dotenv.config({ path: localEnvPath });
+    }
+  } catch (err) {
+    // ignore loading errors; we'll surface helpful error below if vars missing
+    console.error('Failed to load local env file:', err.message);
+  }
+};
+
+loadLocalEnv();
 
 /**
  * Send OTP email using Nodemailer
@@ -12,7 +35,9 @@ const sendorgEmail = async (to, subject, otp) => {
   try {
     // Validate environment variables
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      throw new Error('Email configuration missing. Please set EMAIL_USER and EMAIL_PASS in .env.local');
+      throw new Error(
+        'Email configuration missing. Set EMAIL_USER and EMAIL_PASS in environment or create .env.local / local.env at project root.'
+      );
     }
 
     // Create transporter
@@ -24,7 +49,7 @@ const sendorgEmail = async (to, subject, otp) => {
       },
     });
 
-    // 🌟 HTML Email Template
+    // HTML Email Template
     const html = `
     <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 30px;">
       <div style="max-width: 600px; background: white; margin: auto; border-radius: 10px; overflow: hidden; box-shadow: 0px 4px 10px rgba(0,0,0,0.1);">
@@ -77,3 +102,4 @@ const sendorgEmail = async (to, subject, otp) => {
 };
 
 export default sendorgEmail;
+// ...existing code...
