@@ -1,7 +1,6 @@
 // ...existing code...
 import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
 
 // try loading environment file for development (checks .env.local then local.env)
