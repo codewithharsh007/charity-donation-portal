@@ -36,10 +36,8 @@ export default function Navbar() {
   }, [pathname]); // Re-check when route changes
 
   // Don't show navbar for admin users
-  if (user && user.role === 'admin') {
-    return null;
-  }
-
+  // (removed stray redirect logic) Navbar should not auto-redirect — login handler controls navigation
+  const dashboardPath = user ? (user.role || user.userType) === 'ngo' ? '/ngoDashboard' : (user.role || user.userType) === 'admin' ? '/admin' : '/donorDashboard' : '/profile';
   return (
     <nav className="sticky top-0 z-50 bg-gray-900 shadow-lg">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
@@ -62,7 +60,7 @@ export default function Navbar() {
           {/* Conditional Rendering: Login/Profile */}
           {user ? (
             <Link 
-              href="/profile"
+              href={dashboardPath}
               className="flex items-center gap-2 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 hover:border-red-500 transition-all cursor-pointer"
             >
               <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-bold">

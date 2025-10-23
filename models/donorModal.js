@@ -3,11 +3,19 @@ import mongoose from 'mongoose';
 
 const donationSchema = new mongoose.Schema({
 
+        // The donor who created this donation
+        donor: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+        },
+
     ngo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Ngo', // ensure this matches your NGO model name
 
     },
+  
     ngoType: {
         type: String,
         enum: ['items', 'money'],

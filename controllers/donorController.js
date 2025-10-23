@@ -2,6 +2,7 @@ import dbConnect from '@/lib/mongodb';
 import Donation from '@/models/donorModal';
 import cloudinary from '@/config/cloudinary';
 import { protect } from '@/middlewares/authMiddleware';
+import mongoose from 'mongoose';
 
 /** Create a donation (donor must be authenticated)
  * Expected body: { ngo, ngoType: 'money'|'items', amount?, items?, note?, images?, videos? }
@@ -94,8 +95,22 @@ export const createDonation = async (request) => {
       return { success: false, message: 'Item donations require at least one successful image or video upload', status: 400 };
     }
 
+    // Ensure donor is stored as an ObjectId when possible
+    // Coerce to ObjectId using 'new' (some mongoose builds require constructor)
+    let donorId;
+    try {
+      if (mongoose.Types.ObjectId.isValid(String(auth.userId))) {
+        donorId = new mongoose.Types.ObjectId(String(auth.userId));
+      } else {
+        donorId = auth.userId;
+      }
+    } catch (e) {
+      // Fallback: use raw value
+      donorId = auth.userId;
+    }
+
     const donation = new Donation({
-      donor: auth.userId,
+      donor: donorId,
       ngo,
       ngoType,
       amount: ngoType === 'money' ? amount : undefined,
@@ -106,9 +121,20 @@ export const createDonation = async (request) => {
       status: 'pending',
     });
 
-    await donation.save();
+    // Server-side authoritative assignment: ensure donor is explicitly set from auth.userId
+    try {
+      donation.donor = mongoose.Types.ObjectId.isValid(String(auth.userId))
+        ? new mongoose.Types.ObjectId(String(auth.userId))
+        : String(auth.userId);
+    } catch (e) {
+      donation.donor = String(auth.userId);
+    }
 
-    return { success: true, message: 'Donation created', donation, status: 201 };
+    // Save and minimal debug to confirm success
+    const savedDonation = await donation.save();
+    console.debug('createDonation - saved donation id:', savedDonation._id, ' donor:', String(savedDonation.donor));
+
+    return { success: true, message: 'Donation created', donation: savedDonation, status: 201 };
   } catch (err) {
     console.error('❌ createDonation error:', err);
     return { success: false, message: 'Server error', error: err.message, status: 500 };
@@ -121,13 +147,27 @@ export const getDonorDonations = async (request) => {
     const auth = await protect(request);
     if (!auth.success) return auth;
 
+    // Debug: log auth shape to help trace errors during development
+    console.debug('getDonorDonations - auth result:', {
+      success: auth.success,
+      userId: String(auth.userId),
+      userPresent: !!auth.user,
+    });
+
     await dbConnect();
+
+    // Defensive check: ensure Donation model has a find function
+    if (!Donation || typeof Donation.find !== 'function') {
+      console.error('Donation model is not available or invalid:', Donation);
+      return { success: false, message: 'Server misconfiguration: Donation model missing', status: 500 };
+    }
+
     const donations = await Donation.find({ donor: auth.userId }).sort({ createdAt: -1 });
 
     return { success: true, donations, status: 200 };
   } catch (err) {
-    console.error('❌ getDonorDonations error:', err);
-    return { success: false, message: 'Server error', error: err.message, status: 500 };
+    console.error('❌ getDonorDonations error:', err && err.stack ? err.stack : err);
+    return { success: false, message: 'Server error fetching donations', error: err.message, status: 500 };
   }
 };
 

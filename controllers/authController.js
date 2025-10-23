@@ -31,8 +31,13 @@ export const sendOtp = async (email) => {
       expires: Date.now() + 10 * 60 * 1000, // 10 min expiry
     });
 
-    // Send OTP email
-    await sendorgEmail(email, "Your OTP Code", otp);
+    // Send OTP email (helper may return devOtp in development)
+    const sendResult = await sendorgEmail(email, "Your OTP Code", otp);
+
+    // If helper returned a devOtp (when EMAIL_* missing), include it in response only in non-production
+    if (sendResult && sendResult.devOtp && process.env.NODE_ENV !== 'production') {
+      return { success: true, message: "OTP sent to email (dev)", status: 200, otp: sendResult.devOtp };
+    }
 
     return { success: true, message: "OTP sent to email", status: 200 };
   } catch (err) {

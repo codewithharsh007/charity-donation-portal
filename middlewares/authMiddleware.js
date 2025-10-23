@@ -29,13 +29,17 @@ export const protect = async (request) => {
       };
     }
 
-    // Verify token
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return { 
-        success: false, 
-        message: 'Token invalid or expired', 
-        status: 401 
+    // Verify token (handle verify errors gracefully)
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+    } catch (verifyErr) {
+      // Token malformed or expired - return 401 instead of 500
+      console.warn('Token verification failed:', verifyErr.message || verifyErr);
+      return {
+        success: false,
+        message: 'Token invalid or expired',
+        status: 401,
       };
     }
 

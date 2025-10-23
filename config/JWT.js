@@ -19,6 +19,7 @@ export const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax", // Protects against CSRF attacks
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  // Next.js cookies().set expects maxAge in seconds.
+  maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
   path: "/", // Makes cookie available across all routes
 };

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { escape } from 'querystring';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,11 +44,14 @@ export default function LoginPage() {
         // Trigger custom event to update Navbar
         window.dispatchEvent(new Event('userLoggedIn'));
         
-        // Redirect based on user role
-        if (data.user.role === 'admin') {
+        // Redirect based on user role or userType
+        const role = data.user.role || data.user.userType;
+        if (role === 'admin') {
           router.push('/admin');
-        } else {
-          router.push('/');
+        } else if (role === 'donor') {
+          router.push('/donorDashboard');
+        } else if (role === 'ngo') {
+          router.push('/ngoDashboard');
         }
         router.refresh();
       } else {

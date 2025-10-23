@@ -52,6 +52,7 @@ export const submitVerification = async (userId, verificationData) => {
       verification = await NgoVerification.findByIdAndUpdate(
         existingApp._id,
         {
+          userId,
           ...verificationData,
           verificationStatus: 'pending',
           submittedAt: Date.now(),
@@ -63,6 +64,12 @@ export const submitVerification = async (userId, verificationData) => {
         },
         { new: true, runValidators: true }
       );
+      // ensure userId persisted and populate user info for response
+      if (verification && !verification.userId) {
+        verification.userId = userId;
+        await verification.save();
+      }
+      if (verification) await verification.populate('userId', 'userName email userType');
     } else {
       // First application
       verification = new NgoVerification({
@@ -113,7 +120,7 @@ export const submitVerification = async (userId, verificationData) => {
 // Get verification status for logged-in NGO
 export const getVerificationStatus = async (userId) => {
   try {
-    const verification = await NgoVerification.findOne({ userId });
+  const verification = await NgoVerification.findOne({ userId }).populate('userId', 'userName email userType');
 
     if (!verification) {
       return {

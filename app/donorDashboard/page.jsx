@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function DonorDashboardPage() {
   const [donations, setDonations] = useState([]);
+  const router = useRouter();
   const [ngoId, setNgoId] = useState('');
   const [ngoType, setNgoType] = useState('money');
   const [amount, setAmount] = useState('');
@@ -17,6 +19,21 @@ export default function DonorDashboardPage() {
   const [videoPreviews, setVideoPreviews] = useState([]);
   const [activeTab, setActiveTab] = useState('donations');
   const [searchTerm, setSearchTerm] = useState('');
+  // Profile UI state
+  const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    userName: '',
+    lastName: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: ''
+  });
+  const [profileMessage, setProfileMessage] = useState('');
 
   useEffect(() => {
     fetchDonations();
@@ -39,14 +56,39 @@ export default function DonorDashboardPage() {
     }
   };
 
+  // Logout helper
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout request failed', err);
+    }
+    try { localStorage.removeItem('user'); } catch (e) {}
+    try { router.push('/'); } catch (e) {}
+    try { router.refresh(); } catch (e) {}
+  };
+
   const fetchNgos = async () => {
     try {
-      const res = await fetch('/api/ngo/verification');
+  // Request all statuses so dev/pending NGOs are visible in the dropdown.
+  // Change to '?status=accepted' for production to show only verified NGOs.
+  const res = await fetch('/api/ngos?status=all');
       const text = await res.text();
       let data;
       try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
       if (res.ok) {
-        setNgos((data && data.verifications) || []);
+        // Normalize API shape: accept id or _id and different field names
+        const raw = (data && data.ngos) || [];
+        console.debug('fetchNgos - raw response:', raw);
+        const normalized = raw.map(n => ({
+          id: n.id || n._id || (n._id && String(n._id)) || '',
+          ngoName: n.ngoName || n.name || '',
+          ngoAddress: n.ngoAddress || n.address || (n.ngoImage && n.ngoImage.address) || '',
+          ngoImage: n.ngoImage || null,
+        }));
+        setNgos(normalized);
+      } else {
+        console.error('Failed to load NGOs:', (data && data.message) || res.statusText);
       }
     } catch (err) {
       console.error('Failed to load NGOs:', err);
@@ -173,6 +215,84 @@ export default function DonorDashboardPage() {
     }
   };
 
+  // PROFILE: fetch and edit helpers
+  const fetchProfile = async () => {
+    setProfileLoading(true);
+    setProfileMessage('');
+    try {
+      const res = await fetch('/api/user/profile');
+      const text = await res.text();
+      let data;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+      if (!res.ok) {
+        setProfileMessage((data && data.message) || res.statusText || 'Failed to load profile');
+        return;
+      }
+      const user = (data && data.user) || null;
+      setProfile(user);
+      setProfileForm({
+        userName: user?.userName || '',
+        lastName: user?.lastName || '',
+        phone: user?.phone || '',
+        address: user?.address || '',
+        city: user?.city || '',
+        state: user?.state || '',
+        pincode: user?.pincode || ''
+      });
+      setIsProfileOpen(true);
+      setIsEditingProfile(false);
+    } catch (err) {
+      setProfileMessage(err.message || 'Failed to load profile');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleProfileChange = (e) => {
+    const { name, value } = e.target;
+    setProfileForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleProfileSave = async () => {
+    setProfileLoading(true);
+    setProfileMessage('');
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileForm),
+      });
+      const text = await res.text();
+      let data;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+      if (!res.ok) {
+        setProfileMessage((data && data.message) || res.statusText || 'Update failed');
+        return;
+      }
+      const updated = (data && data.user) || null;
+      setProfile(updated);
+      setIsEditingProfile(false);
+      setProfileMessage((data && data.message) || 'Profile updated');
+
+      // Update localStorage user if present
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) {
+          const existing = JSON.parse(raw);
+          const merged = { ...existing, ...updated };
+          localStorage.setItem('user', JSON.stringify(merged));
+        }
+      } catch (e) {
+        // ignore
+      }
+    } catch (err) {
+      setProfileMessage(err.message || 'Update failed');
+    } finally {
+      setProfileLoading(false);
+      setTimeout(() => setProfileMessage(''), 3000);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
@@ -225,11 +345,33 @@ export default function DonorDashboardPage() {
               </h1>
               <p className="text-gray-600 mt-2">Track your impact and make new donations</p>
             </div>
-            <div className="bg-white rounded-2xl shadow-sm p-4 min-w-[200px] border border-gray-100">
-              <div className="text-2xl font-bold text-green-600">₹{totalDonated.toLocaleString()}</div>
-              <div className="text-sm text-gray-500 flex items-center gap-1">
-                <span>Total Donated</span>
-                <span className="text-green-500">↑</span>
+            <div className="flex items-center gap-4">
+
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isProfileOpen) fetchProfile();
+                    else setIsProfileOpen(false);
+                  }}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:shadow-sm"
+                >
+                  👤 Profile
+                </button>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    // call local handler
+                    try { await handleLogout(); } catch (e) { /* ignore */ }
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+                >
+                  Logout
+                </button>
               </div>
             </div>
           </div>
@@ -237,6 +379,128 @@ export default function DonorDashboardPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        {isProfileOpen && (
+          <div className="mb-6">
+            <div className="bg-white rounded-2xl shadow p-6 border border-gray-100">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Your Profile</h3>
+                  <p className="text-sm text-gray-500 mt-1">Manage your account details</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!isEditingProfile ? (
+                    <button
+                      onClick={() => setIsEditingProfile(true)}
+                      className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-md border border-blue-100"
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleProfileSave}
+                        disabled={profileLoading}
+                        className="px-3 py-1 text-sm bg-green-600 text-white rounded-md"
+                      >
+                        {profileLoading ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => { setIsEditingProfile(false); setProfileForm({
+                          userName: profile?.userName || '',
+                          lastName: profile?.lastName || '',
+                          phone: profile?.phone || '',
+                          address: profile?.address || '',
+                          city: profile?.city || '',
+                          state: profile?.state || '',
+                          pincode: profile?.pincode || ''
+                        }); }}
+                        className="px-3 py-1 text-sm bg-white border rounded-md"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setIsProfileOpen(false)}
+                    className="px-3 py-1 text-sm bg-white border rounded-md"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-600">First name</label>
+                  {isEditingProfile ? (
+                    <input name="userName" value={profileForm.userName} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
+                  ) : (
+                    <p className="text-gray-900">{profile?.userName || '-'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600">Last name</label>
+                  {isEditingProfile ? (
+                    <input name="lastName" value={profileForm.lastName} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
+                  ) : (
+                    <p className="text-gray-900">{profile?.lastName || '-'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600">Phone</label>
+                  {isEditingProfile ? (
+                    <input name="phone" value={profileForm.phone} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
+                  ) : (
+                    <p className="text-gray-900">{profile?.phone || '-'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600">Pincode</label>
+                  {isEditingProfile ? (
+                    <input name="pincode" value={profileForm.pincode} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
+                  ) : (
+                    <p className="text-gray-900">{profile?.pincode || '-'}</p>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-gray-600">Address</label>
+                  {isEditingProfile ? (
+                    <input name="address" value={profileForm.address} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
+                  ) : (
+                    <p className="text-gray-900">{profile?.address || '-'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600">City</label>
+                  {isEditingProfile ? (
+                    <input name="city" value={profileForm.city} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
+                  ) : (
+                    <p className="text-gray-900">{profile?.city || '-'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600">State</label>
+                  {isEditingProfile ? (
+                    <input name="state" value={profileForm.state} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
+                  ) : (
+                    <p className="text-gray-900">{profile?.state || '-'}</p>
+                  )}
+                </div>
+              </div>
+
+              {profileMessage && (
+                <div className="mt-4 text-sm text-center text-green-600">{profileMessage}</div>
+              )}
+            </div>
+          </div>
+        )}
         
 
         {/* Main Content */}
@@ -343,7 +607,7 @@ export default function DonorDashboardPage() {
                                   {donation.ngoType === 'money' ? 'Financial Donation' : 'Item Donation'}
                                 </h3>
                                 <p className="text-gray-600 text-sm">
-                                  To: {ngos.find(n => n.userId === donation.ngo)?.ngoName || donation.ngo}
+                                  To: {ngos.find(n => n.id === donation.ngo)?.ngoName || donation.ngo}
                                 </p>
                               </div>
                             </div>
@@ -434,8 +698,8 @@ export default function DonorDashboardPage() {
                       >
                         <option value="">Select an NGO to support</option>
                         {ngos.map(n => (
-                          <option key={n._id} value={n.userId}>
-                            {n.ngoName || n.registrationNumber || n._id}
+                          <option key={n.id} value={n.id}>
+                            {n.ngoName ? `${n.ngoName}${n.ngoAddress ? ` — ${n.ngoAddress}` : ''}` : n.id}
                           </option>
                         ))}
                       </select>

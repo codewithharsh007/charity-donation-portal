@@ -144,37 +144,9 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess("Registration successful! Logging you in...");
-
-        // Auto-login after registration
-        try {
-          const loginResponse = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: formData.email,
-              password: formData.password,
-            }),
-          });
-
-          const loginData = await loginResponse.json();
-
-          if (loginResponse.ok) {
-            // Store user data in localStorage
-            localStorage.setItem("user", JSON.stringify(loginData.user));
-            // Dispatch custom event to update navbar
-            window.dispatchEvent(new Event("userLoggedIn"));
-
-            // Redirect to home page
-            setTimeout(() => router.push("/"), 1500);
-          } else {
-            setSuccess("Registration successful! Please login.");
-            setTimeout(() => router.push("/login"), 2000);
-          }
-        } catch (loginErr) {
-          setSuccess("Registration successful! Please login.");
-          setTimeout(() => router.push("/login"), 2000);
-        }
+        setSuccess("Registration successful! Please login.");
+        // Redirect user to the login page so they can sign in
+        setTimeout(() => router.push('/login'), 1200);
       } else {
         setError(data.message || "Registration failed");
       }
