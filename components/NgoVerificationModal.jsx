@@ -96,9 +96,10 @@ export default function NgoVerificationModal() {
         const data = await response.json();
         setVerificationStatus(data.verification);
 
-        // Show modal if:
-        // - No verification record
+        // Show modal only if:
+        // - No verification record exists OR
         // - Verification is rejected and attempts remaining > 0
+        // Don't show modal if status is 'pending' or 'accepted'
         if (!data.verification) {
           setShowModal(true);
         } else if (
@@ -106,14 +107,17 @@ export default function NgoVerificationModal() {
           data.verification.attemptsRemaining > 0
         ) {
           setShowModal(true);
-        } else if (data.verification.verificationStatus === 'pending') {
-          setShowModal(false); // Don't show, display "under review" message
-        } else if (data.verification.verificationStatus === 'accepted') {
-          setShowModal(false); // Verified, don't show
+        } else {
+          // For 'pending' or 'accepted' status, always hide the modal
+          setShowModal(false);
         }
+      } else {
+        // If API fails or user not authenticated, hide modal
+        setShowModal(false);
       }
     } catch (err) {
       console.error('Error fetching verification status:', err);
+      setShowModal(false);
     }
   };
 

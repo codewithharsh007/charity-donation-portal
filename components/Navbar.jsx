@@ -35,8 +35,8 @@ export default function Navbar() {
     };
   }, [pathname]); // Re-check when route changes
 
-  // Hide navbar on admin pages
-  if (pathname?.startsWith('/admin')) {
+  // Hide navbar on admin pages, donor dashboard, and ngo dashboard
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/donorDashboard') || pathname?.startsWith('/ngoDashboard')) {
     return null;
   }
 

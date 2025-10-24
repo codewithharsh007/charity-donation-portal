@@ -3,25 +3,34 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function DonorDashboardPage() {
-  const [donations, setDonations] = useState([]);
   const router = useRouter();
-  const [ngoId, setNgoId] = useState('');
-  const [ngoType, setNgoType] = useState('money');
-  const [amount, setAmount] = useState('');
-  const [selectedItem, setSelectedItem] = useState('');
-  const [otherItem, setOtherItem] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [ngos, setNgos] = useState([]);
+  const [activeTab, setActiveTab] = useState('financial');
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [lastDonation, setLastDonation] = useState(null);
+  
+  // Financial Donation State
+  const [financialAmount, setFinancialAmount] = useState('');
+  const [financialNote, setFinancialNote] = useState('');
+  const [financialDonations, setFinancialDonations] = useState([]);
+  
+  // Item Donation State
+  const [itemCategory, setItemCategory] = useState('');
+  const [itemDescription, setItemDescription] = useState('');
+  const [itemsList, setItemsList] = useState([]);
+  const [currentItem, setCurrentItem] = useState('');
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [videoFiles, setVideoFiles] = useState([]);
   const [videoPreviews, setVideoPreviews] = useState([]);
-  const [activeTab, setActiveTab] = useState('donations');
-  const [searchTerm, setSearchTerm] = useState('');
-  // Profile UI state
+  const [itemDonations, setItemDonations] = useState([]);
+  
+  // UI State
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('create'); // 'create' or 'history'
+  
+  // Profile State
   const [profile, setProfile] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -33,181 +42,100 @@ export default function DonorDashboardPage() {
     state: '',
     pincode: ''
   });
+  const [profileLoading, setProfileLoading] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
 
   useEffect(() => {
     fetchDonations();
-    fetchNgos();
   }, []);
 
   const fetchDonations = async () => {
     try {
-      setLoading(true);
-      const res = await fetch('/api/donations');
-      const text = await res.text();
-      let data;
-      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-      if (res.ok) setDonations((data && data.donations) || []);
-      else setError((data && data.message) || res.statusText || 'Failed to load donations');
+      // Fetch both financial and item donations
+      const [financialRes, itemsRes] = await Promise.all([
+        fetch('/api/donations/financial'),
+        fetch('/api/donations/items?type=donor')
+      ]);
+
+      if (financialRes.ok) {
+        const data = await financialRes.json();
+        setFinancialDonations(data.donations || []);
+      }
+
+      if (itemsRes.ok) {
+        const data = await itemsRes.json();
+        setItemDonations(data.donations || []);
+      }
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      console.error('Fetch donations error:', err);
     }
   };
 
-  // Logout helper
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch (err) {
-      console.error('Logout request failed', err);
+      console.error('Logout error:', err);
     }
-    try { localStorage.removeItem('user'); } catch (e) {}
-    try { router.push('/'); } catch (e) {}
-    try { router.refresh(); } catch (e) {}
+    localStorage.removeItem('user');
+    router.push('/');
   };
 
-  const fetchNgos = async () => {
-    try {
-  // Request all statuses so dev/pending NGOs are visible in the dropdown.
-  // Change to '?status=accepted' for production to show only verified NGOs.
-  const res = await fetch('/api/ngos?status=all');
-      const text = await res.text();
-      let data;
-      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-      if (res.ok) {
-        // Normalize API shape: accept id or _id and different field names
-        const raw = (data && data.ngos) || [];
-        console.debug('fetchNgos - raw response:', raw);
-        const normalized = raw.map(n => ({
-          id: n.id || n._id || (n._id && String(n._id)) || '',
-          ngoName: n.ngoName || n.name || '',
-          ngoAddress: n.ngoAddress || n.address || (n.ngoImage && n.ngoImage.address) || '',
-          ngoImage: n.ngoImage || null,
-        }));
-        setNgos(normalized);
-      } else {
-        console.error('Failed to load NGOs:', (data && data.message) || res.statusText);
-      }
-    } catch (err) {
-      console.error('Failed to load NGOs:', err);
+  const uploadToCloudinary = async (file) => {
+    const readFileAsDataURL = (f) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      });
+
+    const dataUrl = await readFileAsDataURL(file);
+
+    const response = await fetch('/api/cloudinary/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: dataUrl, filename: file.name }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Upload failed');
     }
+
+    return await response.json();
   };
 
-  const handleCreate = async (e) => {
+  const handleFinancialDonation = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Validation
-    if (!ngoId) {
-      setError('Please select an NGO');
-      setLoading(false);
-      return;
-    }
-
-    if (ngoType === 'money' && (!amount || Number(amount) <= 0)) {
+    if (!financialAmount || Number(financialAmount) <= 0) {
       setError('Please enter a valid amount');
       setLoading(false);
       return;
     }
 
-    if (ngoType === 'items') {
-      if (!selectedItem) {
-        setError('Please select an item category');
-        setLoading(false);
-        return;
-      }
-      if (selectedItem === 'Other' && !otherItem.trim()) {
-        setError('Please specify what you are donating under Other');
-        setLoading(false);
-        return;
-      }
-    }
-
-    if (ngoType === 'items' && imageFiles.length === 0 && videoFiles.length === 0) {
-      setError('For item donations, please attach at least one image or video for verification');
-      setLoading(false);
-      return;
-    }
-
-    // File size validation
-    for (const f of imageFiles) {
-      if (f.size > 5 * 1024 * 1024) {
-        setError(`Image "${f.name}" exceeds 5MB limit`);
-        setLoading(false);
-        return;
-      }
-    }
-
-    for (const f of videoFiles) {
-      if (f.size > 50 * 1024 * 1024) {
-        setError(`Video "${f.name}" exceeds 50MB limit`);
-        setLoading(false);
-        return;
-      }
-    }
-
-    // Convert files to data URLs
-    const toDataUrl = (file) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    let imagesData = [];
-    let videosData = [];
-
     try {
-      imagesData = await Promise.all(imageFiles.map(f => toDataUrl(f)));
-      videosData = await Promise.all(videoFiles.map(f => toDataUrl(f)));
-    } catch (err) {
-      setError('Failed to process files. Please try again.');
-      setLoading(false);
-      return;
-    }
-
-    const payload = {
-      ngo: ngoId,
-      ngoType,
-      amount: ngoType === 'money' ? Number(amount) : undefined,
-      items: ngoType === 'items'
-        ? (selectedItem === 'Other' ? [otherItem.trim()] : [selectedItem])
-        : [],
-      imagesData,
-      videosData,
-    };
-
-    try {
-      const res = await fetch('/api/donations', {
+      const res = await fetch('/api/donations/financial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          amount: Number(financialAmount),
+          note: financialNote,
+        }),
       });
-      
-      const text = await res.text();
-      let data;
-      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-      
+
+      const data = await res.json();
+
       if (!res.ok) {
-        const msg = (data && data.message) || res.statusText || 'Create failed';
-        throw new Error(msg);
+        throw new Error(data.message || 'Donation failed');
       }
-      
-      await fetchDonations();
-      // Reset form
-      setAmount('');
-  setSelectedItem('');
-  setOtherItem('');
-      setNgoId('');
-      setImageFiles([]);
-      setImagePreviews([]);
-      setVideoFiles([]);
-      setVideoPreviews([]);
-      setActiveTab('donations');
-      
+
+      setLastDonation(data.donation);
+      setShowThankYou(true);
+      setFinancialAmount('');
+      setFinancialNote('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -215,805 +143,956 @@ export default function DonorDashboardPage() {
     }
   };
 
-  // PROFILE: fetch and edit helpers
+  const handleItemDonation = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    if (!itemCategory) {
+      setError('Please select a category');
+      setLoading(false);
+      return;
+    }
+
+    if (itemsList.length === 0) {
+      setError('Please add at least one item');
+      setLoading(false);
+      return;
+    }
+
+    if (imageFiles.length === 0 && videoFiles.length === 0) {
+      setError('Please upload at least one image or video');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Upload images
+      const uploadedImages = await Promise.all(
+        imageFiles.map(async (file) => {
+          const result = await uploadToCloudinary(file);
+          return {
+            url: result.secure_url,
+            publicId: result.public_id,
+          };
+        })
+      );
+
+      // Upload videos
+      const uploadedVideos = await Promise.all(
+        videoFiles.map(async (file) => {
+          const result = await uploadToCloudinary(file);
+          return {
+            url: result.secure_url,
+            publicId: result.public_id,
+          };
+        })
+      );
+
+      const res = await fetch('/api/donations/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: itemsList,
+          category: itemCategory,
+          description: itemDescription,
+          images: uploadedImages,
+          videos: uploadedVideos,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Donation failed');
+      }
+
+      alert('Item donation submitted! It will be reviewed by admin.');
+      // Reset form
+      setItemCategory('');
+      setItemDescription('');
+      setItemsList([]);
+      setImageFiles([]);
+      setImagePreviews([]);
+      setVideoFiles([]);
+      setVideoPreviews([]);
+      setViewMode('history');
+      fetchDonations();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addItem = () => {
+    if (currentItem.trim()) {
+      setItemsList([...itemsList, currentItem.trim()]);
+      setCurrentItem('');
+    }
+  };
+
+  const removeItem = (index) => {
+    setItemsList(itemsList.filter((_, i) => i !== index));
+  };
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    setImageFiles([...imageFiles, ...files]);
+    
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreviews((prev) => [...prev, reader.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleVideoUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    setVideoFiles([...videoFiles, ...files]);
+    
+    files.forEach((file) => {
+      const url = URL.createObjectURL(file);
+      setVideoPreviews((prev) => [...prev, url]);
+    });
+  };
+
+  const removeImage = (index) => {
+    setImageFiles(imageFiles.filter((_, i) => i !== index));
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+  };
+
+  const removeVideo = (index) => {
+    setVideoFiles(videoFiles.filter((_, i) => i !== index));
+    setVideoPreviews(videoPreviews.filter((_, i) => i !== index));
+  };
+
   const fetchProfile = async () => {
     setProfileLoading(true);
-    setProfileMessage('');
     try {
       const res = await fetch('/api/user/profile');
-      const text = await res.text();
-      let data;
-      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-      if (!res.ok) {
-        setProfileMessage((data && data.message) || res.statusText || 'Failed to load profile');
-        return;
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data.user);
+        setProfileForm({
+          userName: data.user?.userName || '',
+          lastName: data.user?.lastName || '',
+          phone: data.user?.phone || '',
+          address: data.user?.address || '',
+          city: data.user?.city || '',
+          state: data.user?.state || '',
+          pincode: data.user?.pincode || ''
+        });
+        setIsProfileOpen(true);
       }
-      const user = (data && data.user) || null;
-      setProfile(user);
-      setProfileForm({
-        userName: user?.userName || '',
-        lastName: user?.lastName || '',
-        phone: user?.phone || '',
-        address: user?.address || '',
-        city: user?.city || '',
-        state: user?.state || '',
-        pincode: user?.pincode || ''
-      });
-      setIsProfileOpen(true);
-      setIsEditingProfile(false);
     } catch (err) {
-      setProfileMessage(err.message || 'Failed to load profile');
+      console.error('Fetch profile error:', err);
     } finally {
       setProfileLoading(false);
     }
   };
 
-  const handleProfileChange = (e) => {
-    const { name, value } = e.target;
-    setProfileForm(prev => ({ ...prev, [name]: value }));
-  };
-
   const handleProfileSave = async () => {
     setProfileLoading(true);
-    setProfileMessage('');
     try {
       const res = await fetch('/api/user/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profileForm),
       });
-      const text = await res.text();
-      let data;
-      try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-      if (!res.ok) {
-        setProfileMessage((data && data.message) || res.statusText || 'Update failed');
-        return;
-      }
-      const updated = (data && data.user) || null;
-      setProfile(updated);
-      setIsEditingProfile(false);
-      setProfileMessage((data && data.message) || 'Profile updated');
-
-      // Update localStorage user if present
-      try {
-        const raw = localStorage.getItem('user');
-        if (raw) {
-          const existing = JSON.parse(raw);
-          const merged = { ...existing, ...updated };
-          localStorage.setItem('user', JSON.stringify(merged));
-        }
-      } catch (e) {
-        // ignore
+      
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data.user);
+        setIsEditingProfile(false);
+        setProfileMessage('Profile updated successfully');
+        setTimeout(() => setProfileMessage(''), 3000);
       }
     } catch (err) {
-      setProfileMessage(err.message || 'Update failed');
+      setProfileMessage('Update failed');
     } finally {
       setProfileLoading(false);
-      setTimeout(() => setProfileMessage(''), 3000);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+  const getStatusBadge = (donation) => {
+    const statusMap = {
+      pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: '⏳', text: 'Pending Admin Review' },
+      approved: { color: 'bg-green-100 text-green-800 border-green-200', icon: '✅', text: 'Approved' },
+      rejected: { color: 'bg-red-100 text-red-800 border-red-200', icon: '❌', text: 'Rejected' },
+    };
+
+    const deliveryMap = {
+      not_picked_up: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: '📦', text: 'Awaiting Pickup' },
+      picked_up: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: '🚚', text: 'Picked Up' },
+      received: { color: 'bg-green-100 text-green-800 border-green-200', icon: '🎉', text: 'Received' },
+    };
+
+    const adminStatus = statusMap[donation.adminStatus] || statusMap.pending;
+    const deliveryStatus = deliveryMap[donation.deliveryStatus];
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${adminStatus.color}`}>
+          <span className="mr-2">{adminStatus.icon}</span>
+          {adminStatus.text}
+        </span>
+        {deliveryStatus && (
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${deliveryStatus.color}`}>
+            <span className="mr-2">{deliveryStatus.icon}</span>
+            {deliveryStatus.text}
+          </span>
+        )}
+      </div>
+    );
   };
 
-  const getStatusIcon = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'completed': return '✅';
-      case 'pending': return '⏳';
-      case 'processing': return '🔄';
-      case 'cancelled': return '❌';
-      default: return '📋';
-    }
-  };
+  if (showThankYou) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
+          <div className="mb-6">
+            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-5xl">🎉</span>
+            </div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Thank You!</h1>
+            <p className="text-xl text-gray-600 mb-6">
+              Your generous donation of <span className="font-bold text-green-600">₹{lastDonation?.amount?.toLocaleString()}</span> has been received.
+            </p>
+          </div>
 
-  const totalDonated = donations.reduce((sum, donation) => {
-    return donation.ngoType === 'money' ? sum + (donation.amount || 0) : sum;
-  }, 0);
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+            <h3 className="font-semibold text-gray-900 mb-2">What's Next?</h3>
+            <p className="text-gray-700 text-sm">
+              We will keep you informed via email about how your donation is being utilized to support various causes and make a real difference in the lives of those in need.
+            </p>
+          </div>
 
-  const filteredDonations = donations.filter(donation => {
-    const matchesSearch = donation.ngo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (donation.items || []).join(' ').toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-blue-800">
+              <strong>Transaction ID:</strong> {lastDonation?.transactionId}
+            </p>
+          </div>
 
-  const removeImage = (index) => {
-    setImageFiles(prev => prev.filter((_, i) => i !== index));
-    setImagePreviews(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const removeVideo = (index) => {
-    setVideoFiles(prev => prev.filter((_, i) => i !== index));
-    setVideoPreviews(prev => prev.filter((_, i) => i !== index));
-  };
+          <button
+            onClick={() => {
+              setShowThankYou(false);
+              fetchDonations();
+            }}
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       {/* Header */}
-      <header className="bg-white shadow-lg border-b border-gray-200">
+      <header className="bg-gray-900 shadow-lg border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-6 gap-4">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 Donor Dashboard
               </h1>
-              <p className="text-gray-600 mt-2">Track your impact and make new donations</p>
+              <p className="text-gray-300 mt-2">Make a difference in the world</p>
             </div>
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/')}
+                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white hover:bg-gray-700 hover:border-blue-500 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Home
+              </button>
 
+              <button
+                onClick={() => {
+                  if (!isProfileOpen) fetchProfile();
+                  else setIsProfileOpen(false);
+                }}
+                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white hover:bg-gray-700"
+              >
+                👤 Profile
+              </button>
 
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!isProfileOpen) fetchProfile();
-                    else setIsProfileOpen(false);
-                  }}
-                  className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:shadow-sm"
-                >
-                  👤 Profile
-                </button>
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    // call local handler
-                    try { await handleLogout(); } catch (e) { /* ignore */ }
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-                >
-                  Logout
-                </button>
-              </div>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
+        {/* Profile Section */}
         {isProfileOpen && (
-          <div className="mb-6">
-            <div className="bg-white rounded-2xl shadow p-6 border border-gray-100">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Your Profile</h3>
-                  <p className="text-sm text-gray-500 mt-1">Manage your account details</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!isEditingProfile ? (
-                    <>
-                      <button
-                        onClick={() => setIsEditingProfile(true)}
-                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
-                      >
-                        Edit Profile
-                      </button>
-                      <button
-                        onClick={() => setIsProfileOpen(false)}
-                        className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
-                      >
-                        Close
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={handleProfileSave}
-                        disabled={profileLoading}
-                        className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors disabled:opacity-50"
-                      >
-                        {profileLoading ? 'Saving...' : 'Save Changes'}
-                      </button>
-                      <button
-                        onClick={() => { setIsEditingProfile(false); setProfileForm({
-                          userName: profile?.userName || '',
-                          lastName: profile?.lastName || '',
-                          phone: profile?.phone || '',
-                          address: profile?.address || '',
-                          city: profile?.city || '',
-                          state: profile?.state || '',
-                          pincode: profile?.pincode || ''
-                        }); }}
-                        className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                </div>
+          <div className="mb-6 bg-white rounded-2xl shadow p-6 border border-gray-100">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Your Profile</h3>
+                <p className="text-sm text-gray-500 mt-1">Manage your account details</p>
               </div>
-
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-600">First name</label>
-                  {isEditingProfile ? (
-                    <input name="userName" value={profileForm.userName} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
-                  ) : (
-                    <p className="text-gray-900">{profile?.userName || '-'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600">Last name</label>
-                  {isEditingProfile ? (
-                    <input name="lastName" value={profileForm.lastName} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
-                  ) : (
-                    <p className="text-gray-900">{profile?.lastName || '-'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600">Phone</label>
-                  {isEditingProfile ? (
-                    <input name="phone" value={profileForm.phone} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
-                  ) : (
-                    <p className="text-gray-900">{profile?.phone || '-'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600">Pincode</label>
-                  {isEditingProfile ? (
-                    <input name="pincode" value={profileForm.pincode} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
-                  ) : (
-                    <p className="text-gray-900">{profile?.pincode || '-'}</p>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm text-gray-600">Address</label>
-                  {isEditingProfile ? (
-                    <input name="address" value={profileForm.address} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
-                  ) : (
-                    <p className="text-gray-900">{profile?.address || '-'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600">City</label>
-                  {isEditingProfile ? (
-                    <input name="city" value={profileForm.city} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
-                  ) : (
-                    <p className="text-gray-900">{profile?.city || '-'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600">State</label>
-                  {isEditingProfile ? (
-                    <input name="state" value={profileForm.state} onChange={handleProfileChange} className="w-full px-3 py-2 border rounded-lg text-black" />
-                  ) : (
-                    <p className="text-gray-900">{profile?.state || '-'}</p>
-                  )}
-                </div>
+              <div className="flex items-center gap-2">
+                {!isEditingProfile ? (
+                  <>
+                    <button
+                      onClick={() => setIsEditingProfile(true)}
+                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Edit Profile
+                    </button>
+                    <button
+                      onClick={() => setIsProfileOpen(false)}
+                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                    >
+                      Close
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleProfileSave}
+                      disabled={profileLoading}
+                      className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {profileLoading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      onClick={() => setIsEditingProfile(false)}
+                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
               </div>
-
-              {profileMessage && (
-                <div className="mt-4 text-sm text-center text-green-600">{profileMessage}</div>
-              )}
             </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-600">First name</label>
+                {isEditingProfile ? (
+                  <input
+                    name="userName"
+                    value={profileForm.userName}
+                    onChange={(e) => setProfileForm({ ...profileForm, userName: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-black"
+                  />
+                ) : (
+                  <p className="text-gray-900">{profile?.userName || '-'}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">Last name</label>
+                {isEditingProfile ? (
+                  <input
+                    name="lastName"
+                    value={profileForm.lastName}
+                    onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-black"
+                  />
+                ) : (
+                  <p className="text-gray-900">{profile?.lastName || '-'}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">Phone</label>
+                {isEditingProfile ? (
+                  <input
+                    name="phone"
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-black"
+                  />
+                ) : (
+                  <p className="text-gray-900">{profile?.phone || '-'}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">Pincode</label>
+                {isEditingProfile ? (
+                  <input
+                    name="pincode"
+                    value={profileForm.pincode}
+                    onChange={(e) => setProfileForm({ ...profileForm, pincode: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-black"
+                  />
+                ) : (
+                  <p className="text-gray-900">{profile?.pincode || '-'}</p>
+                )}
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm text-gray-600">Address</label>
+                {isEditingProfile ? (
+                  <input
+                    name="address"
+                    value={profileForm.address}
+                    onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-black"
+                  />
+                ) : (
+                  <p className="text-gray-900">{profile?.address || '-'}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">City</label>
+                {isEditingProfile ? (
+                  <input
+                    name="city"
+                    value={profileForm.city}
+                    onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-black"
+                  />
+                ) : (
+                  <p className="text-gray-900">{profile?.city || '-'}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">State</label>
+                {isEditingProfile ? (
+                  <input
+                    name="state"
+                    value={profileForm.state}
+                    onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-black"
+                  />
+                ) : (
+                  <p className="text-gray-900">{profile?.state || '-'}</p>
+                )}
+              </div>
+            </div>
+            {profileMessage && (
+              <div className="mt-4 text-sm text-center text-green-600">{profileMessage}</div>
+            )}
           </div>
         )}
-        
 
         {/* Main Content */}
-        <div className="bg-white rounded-2xl shadow-lg mb-8 border border-gray-100 overflow-hidden">
-          {/* Navigation Tabs */}
-          <div className="border-b border-gray-200 bg-gray-50">
-            <nav className="flex -mb-px">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          {/* View Mode Toggle */}
+          <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+            <div className="flex gap-2">
               <button
-                onClick={() => setActiveTab('donations')}
-                className={`flex items-center py-4 px-6 text-center border-b-2 font-medium text-sm transition-all duration-200 ${
-                  activeTab === 'donations'
-                    ? 'border-blue-500 text-blue-600 bg-white shadow-sm'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                onClick={() => setViewMode('create')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  viewMode === 'create'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <span className="mr-2">📋</span>
-                Your Donations
-                {donations.length > 0 && (
-                  <span className="ml-2 bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full">
-                    {donations.length}
-                  </span>
-                )}
+                Make Donation
               </button>
               <button
-                onClick={() => setActiveTab('create')}
-                className={`flex items-center py-4 px-6 text-center border-b-2 font-medium text-sm transition-all duration-200 ${
-                  activeTab === 'create'
-                    ? 'border-blue-500 text-blue-600 bg-white shadow-sm'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                onClick={() => setViewMode('history')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  viewMode === 'history'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <span className="mr-2">✨</span>
-                Make New Donation
+                All Donation History
               </button>
-            </nav>
+            </div>
           </div>
 
           <div className="p-6">
-            {activeTab === 'donations' && (
-              <div>
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-                  <h2 className="text-2xl font-bold text-gray-900">Donation History</h2>
-                  
-                  <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                    <div className="relative flex-1 sm:flex-none">
-                      <input
-                        type="text"
-                        placeholder="Search donations..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full sm:w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                      />
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                        🔍
-                      </div>
-                    </div>
-                    
-                    
-                  </div>
-                </div>
-
-                {loading ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                    <p className="text-gray-500 mt-4">Loading your donations...</p>
-                  </div>
-                ) : filteredDonations.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="text-3xl">📭</span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {donations.length === 0 ? 'No donations yet' : 'No matching donations'}
-                    </h3>
-                    <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                      {donations.length === 0 
-                        ? 'Start making a difference today with your first donation'
-                        : 'Try adjusting your search or filter criteria'
-                      }
-                    </p>
-                    {donations.length === 0 && (
-                      <button
-                        onClick={() => setActiveTab('create')}
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                      >
-                        Make Your First Donation
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredDonations.map((donation) => (
-                      <div key={donation._id} className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 group">
-                        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className={`p-2 rounded-lg ${
-                                donation.ngoType === 'money' ? 'bg-green-50' : 'bg-blue-50'
-                              }`}>
-                                {donation.ngoType === 'money' ? '💰' : '📦'}
-                              </div>
-                              <div>
-                                <h3 className="font-semibold text-gray-900 text-lg">
-                                  {donation.ngoType === 'money' ? 'Financial Donation' : 'Item Donation'}
-                                </h3>
-                                <p className="text-gray-600 text-sm">
-                                  To: {ngos.find(n => n.id === donation.ngo)?.ngoName || donation.ngo}
-                                </p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-4 mt-3">
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <span>🆔</span>
-                                <span>ID: {donation._id?.slice(-8)}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <span>📅</span>
-                                <span>
-                                  {new Date(donation.createdAt).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                  })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-col items-end gap-3">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(donation.status)}`}>
-                              <span className="mr-2">{getStatusIcon(donation.status)}</span>
-                              {donation.status}
-                            </span>
-                            
-                            <div className="text-right">
-                              {donation.ngoType === 'money' ? (
-                                <p className="text-2xl font-bold text-green-600">₹{donation.amount?.toLocaleString()}</p>
-                              ) : (
-                                <div>
-                                  <p className="text-sm font-medium text-gray-600">Items Donated</p>
-                                  <p className="text-gray-900 font-semibold">{donation.items?.join(', ')}</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Media preview for item donations */}
-                        {donation.ngoType === 'items' && donation.imagesData && donation.imagesData.length > 0 && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Attached Media:</p>
-                            <div className="flex gap-2 overflow-x-auto">
-                              {donation.imagesData.slice(0, 3).map((img, index) => (
-                                <img key={index} src={img} alt={`Donation ${index + 1}`} className="w-16 h-16 object-cover rounded-lg border" />
-                              ))}
-                              {donation.imagesData.length > 3 && (
-                                <div className="w-16 h-16 bg-gray-100 rounded-lg border flex items-center justify-center text-xs text-gray-500">
-                                  +{donation.imagesData.length - 3}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'create' && (
+            {/* Create Donation View */}
+            {viewMode === 'create' && (
               <div className="max-w-2xl mx-auto">
                 <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Make a New Donation</h2>
-                  <p className="text-gray-600">Choose how you'd like to make a difference today</p>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Make a Donation</h2>
+                  <p className="text-gray-600">Choose what you'd like to donate</p>
                 </div>
 
-                <form onSubmit={handleCreate} className="space-y-6">
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <span>🏛</span>
-                      Select NGO
-                    </h3>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Choose an organization to support
-                      </label>
-                      <select
-                        value={ngoId}
-                        onChange={(e) => setNgoId(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white text-black"
-                        required
-                      >
-                        <option value="">Select an NGO to support</option>
-                        {ngos.map(n => (
-                          <option key={n.id} value={n.id}>
-                            {n.ngoName ? `${n.ngoName}${n.ngoAddress ? ` — ${n.ngoAddress}` : ''}` : n.id}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-sm text-gray-500 mt-2">
-                        {ngos.length} verified organizations available
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-100">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <span>🎁</span>
-                      Donation Type
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNgoType('money');
-                          setImageFiles([]);
-                          setImagePreviews([]);
-                          setVideoFiles([]);
-                          setVideoPreviews([]);
-                        }}
-                        className={`p-6 border-2 rounded-xl text-center transition-all duration-200 group ${
-                          ngoType === 'money'
-                            ? 'border-green-500 bg-white shadow-lg scale-105'
-                            : 'border-gray-300 bg-white hover:border-green-300 hover:shadow-md'
-                        }`}
-                      >
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3 transition-colors ${
-                          ngoType === 'money' ? 'bg-green-100' : 'bg-gray-100'
-                        }`}>
-                          <span className="text-2xl">💰</span>
-                        </div>
-                        <span className={`font-semibold block mb-2 ${
-                          ngoType === 'money' ? 'text-green-700' : 'text-gray-700'
-                        }`}>Financial Support</span>
-                        <p className="text-sm text-gray-500 group-hover:text-gray-600">
-                          Quick and direct monetary contribution
-                        </p>
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={() => setNgoType('items')}
-                        className={`p-6 border-2 rounded-xl text-center transition-all duration-200 group ${
-                          ngoType === 'items'
-                            ? 'border-blue-500 bg-white shadow-lg scale-105'
-                            : 'border-gray-300 bg-white hover:border-blue-300 hover:shadow-md'
-                        }`}
-                      >
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3 transition-colors ${
-                          ngoType === 'items' ? 'bg-blue-100' : 'bg-gray-100'
-                        }`}>
-                          <span className="text-2xl">📦</span>
-                        </div>
-                        <span className={`font-semibold block mb-2 ${
-                          ngoType === 'items' ? 'text-blue-700' : 'text-gray-700'
-                        }`}>Item Donation</span>
-                        <p className="text-sm text-gray-500 group-hover:text-gray-600">
-                          Donate physical goods and essentials
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {ngoType === 'money' ? (
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-100">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <span>💵</span>
-                        Amount Details
+                {/* Donation Type Selection */}
+                {!activeTab && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <button
+                      onClick={() => setActiveTab('financial')}
+                      className="p-6 border-2 border-gray-200 rounded-2xl hover:border-green-500 hover:bg-green-50 transition-all text-center group"
+                    >
+                      <div className="text-5xl mb-3">💰</div>
+                      <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-600">
+                        Financial Donation
                       </h3>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                          Enter donation amount
-                        </label>
-                        <div className="relative max-w-xs">
+                      <p className="text-sm text-gray-600 mt-2">
+                        Donate money to support various causes
+                      </p>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('items')}
+                      className="p-6 border-2 border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-center group"
+                    >
+                      <div className="text-5xl mb-3">📦</div>
+                      <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">
+                        Item Donation
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-2">
+                        Donate physical items like clothes, books, etc.
+                      </p>
+                    </button>
+                  </div>
+                )}
+
+                {/* Financial Donation Form */}
+                {activeTab === 'financial' && (
+                  <div>
+                    {/* Donation Type Selection Above */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                      <button
+                        onClick={() => setActiveTab('financial')}
+                        className="p-6 border-2 border-green-500 bg-green-50 rounded-2xl text-center"
+                      >
+                        <div className="text-5xl mb-3">💰</div>
+                        <h3 className="text-lg font-semibold text-green-600">
+                          Financial Donation
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-2">
+                          Donate money to support various causes
+                        </p>
+                      </button>
+
+                      <button
+                        onClick={() => setActiveTab('items')}
+                        className="p-6 border-2 border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-center group"
+                      >
+                        <div className="text-5xl mb-3">📦</div>
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">
+                          Item Donation
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-2">
+                          Donate physical items like clothes, books, etc.
+                        </p>
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleFinancialDonation} className="space-y-6">
+                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-100">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <span>💵</span>
+                          Amount
+                        </h3>
+                        <div className="relative max-w-xs mb-4">
                           <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">₹</span>
                           <input
                             type="number"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-lg font-semibold text-black"
+                            value={financialAmount}
+                            onChange={(e) => setFinancialAmount(e.target.value)}
+                            className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 text-lg font-semibold text-black"
                             placeholder="0.00"
                             min="1"
                             required
                           />
                         </div>
-                        <div className="flex gap-2 mt-3">
-                          {[100, 500, 1000, 5000].map((suggestedAmount) => (
+                        <div className="flex gap-2 flex-wrap">
+                          {[100, 500, 1000, 5000].map((amount) => (
                             <button
-                              key={suggestedAmount}
+                              key={amount}
                               type="button"
-                              onClick={() => setAmount(suggestedAmount.toString())}
-                              className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:border-green-500 hover:text-green-600 transition-colors"
+                              onClick={() => setFinancialAmount(amount.toString())}
+                              className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:border-green-500 hover:text-green-600"
                             >
-                              ₹{suggestedAmount}
+                              ₹{amount}
                             </button>
                           ))}
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <span>📝</span>
-                          Item Details
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Note (Optional)
+                        </label>
+                        <textarea
+                          value={financialNote}
+                          onChange={(e) => setFinancialNote(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 text-black"
+                          rows={3}
+                          placeholder="Add a message or dedication..."
+                        />
+                      </div>
+
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                          <p className="text-sm text-red-800">{error}</p>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50 shadow-lg"
+                      >
+                        {loading ? 'Processing...' : 'Donate Now'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {/* Item Donation Form */}
+                {activeTab === 'items' && (
+                  <div>
+                    {/* Donation Type Selection Above */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                      <button
+                        onClick={() => setActiveTab('financial')}
+                        className="p-6 border-2 border-gray-200 rounded-2xl hover:border-green-500 hover:bg-green-50 transition-all text-center group"
+                      >
+                        <div className="text-5xl mb-3">💰</div>
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-600">
+                          Financial Donation
                         </h3>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-3">
-                            What items are you donating?
-                          </label>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Choose item category</label>
-                          <select
-                            value={selectedItem}
-                            onChange={(e) => setSelectedItem(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-black"
-                            required
-                          >
-                            <option value="">Select a category</option>
-                            <option>Food Items</option>
-                            <option>Clothes</option>
-                            <option>Books & Stationery</option>
-                            <option>Toys</option>
-                            <option>Medicines & Health Kits</option>
-                            <option>Electronics</option>
-                            <option>Household Items</option>
-                            <option>Bicycle / Vehicle</option>
-                            <option>Festival Kit / Hygiene Pack</option>
-                            <option>Other</option>
-                          </select>
-                          {selectedItem === 'Other' && (
-                            <div className="mt-3">
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Specify Other</label>
+                        <p className="text-sm text-gray-600 mt-2">
+                          Donate money to support various causes
+                        </p>
+                      </button>
+
+                      <button
+                        onClick={() => setActiveTab('items')}
+                        className="p-6 border-2 border-blue-500 bg-blue-50 rounded-2xl text-center"
+                      >
+                        <div className="text-5xl mb-3">📦</div>
+                        <h3 className="text-lg font-semibold text-blue-600">
+                          Item Donation
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-2">
+                          Donate physical items like clothes, books, etc.
+                        </p>
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleItemDonation} className="space-y-6">
+                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Item Details</h3>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+                            <select
+                              value={itemCategory}
+                              onChange={(e) => setItemCategory(e.target.value)}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-black"
+                              required
+                            >
+                              <option value="">Select a category</option>
+                              <option>Food Items</option>
+                              <option>Clothes</option>
+                              <option>Books & Stationery</option>
+                              <option>Toys</option>
+                              <option>Medicines & Health Kits</option>
+                              <option>Electronics</option>
+                              <option>Household Items</option>
+                              <option>Bicycle / Vehicle</option>
+                              <option>Festival Kit / Hygiene Pack</option>
+                              <option>Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Items *</label>
+                            <div className="flex gap-2">
                               <input
                                 type="text"
-                                value={otherItem}
-                                onChange={(e) => setOtherItem(e.target.value)}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-black"
-                                placeholder="Describe the item you're donating"
+                                value={currentItem}
+                                onChange={(e) => setCurrentItem(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addItem())}
+                                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-black"
+                                placeholder="Enter item name"
                               />
+                              <button
+                                type="button"
+                                onClick={addItem}
+                                className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+                              >
+                                Add
+                              </button>
                             </div>
-                          )}
-                          <p className="text-sm text-gray-500 mt-2">
-                            Choose a category for the items you're donating
-                          </p>
+                            {itemsList.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {itemsList.map((item, index) => (
+                                  <span
+                                    key={index}
+                                    className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-sm"
+                                  >
+                                    {item}
+                                    <button
+                                      type="button"
+                                      onClick={() => removeItem(index)}
+                                      className="ml-2 text-blue-600 hover:text-blue-800"
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                            <textarea
+                              value={itemDescription}
+                              onChange={(e) => setItemDescription(e.target.value)}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-black"
+                              rows={3}
+                              placeholder="Describe the condition and details of items..."
+                            />
+                          </div>
                         </div>
                       </div>
 
                       <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-100">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <span>📷</span>
-                          Media Verification
-                          <span className="text-sm text-red-500 font-normal">(Required for items)</span>
-                        </h3>
-                        
-                        <div className="space-y-6">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-3">
-                              Upload Images (Max 5MB each)
-                            </label>
-                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                onChange={async (e) => {
-                                  const files = Array.from(e.target.files || []);
-                                  setImageFiles(prev => [...prev, ...files]);
-                                  const newPreviews = await Promise.all(files.map(f => new Promise((res) => {
-                                    const r = new FileReader();
-                                    r.onload = () => res(r.result);
-                                    r.readAsDataURL(f);
-                                  })));
-                                  setImagePreviews(prev => [...prev, ...newPreviews]);
-                                }}
-                                className="hidden"
-                                id="image-upload"
-                              />
-                              <label htmlFor="image-upload" className="cursor-pointer">
-                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                                  <span className="text-xl">📸</span>
-                                </div>
-                                <p className="text-gray-600 mb-2">Click to upload images</p>
-                                <p className="text-sm text-gray-500">PNG, JPG, JPEG up to 5MB</p>
-                              </label>
-                            </div>
-                            {imagePreviews.length > 0 && (
-                              <div className="mt-4">
-                                <p className="text-sm font-medium text-gray-700 mb-2">
-                                  Selected Images ({imagePreviews.length})
-                                </p>
-                                <div className="flex flex-wrap gap-3">
-                                  {imagePreviews.map((preview, index) => (
-                                    <div key={index} className="relative">
-                                      <img 
-                                        src={preview} 
-                                        alt={`Preview ${index + 1}`} 
-                                        className="w-20 h-20 object-cover rounded-lg border shadow-sm"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => removeImage(index)}
-                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600"
-                                      >
-                                        ×
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Images *</h3>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          id="image-upload"
+                        />
+                        <label
+                          htmlFor="image-upload"
+                          className="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400"
+                        >
+                          <span className="text-4xl">📸</span>
+                          <p className="mt-2 text-gray-600">Click to upload images</p>
+                        </label>
+                        {imagePreviews.length > 0 && (
+                          <div className="mt-4 grid grid-cols-3 gap-3">
+                            {imagePreviews.map((preview, index) => (
+                              <div key={index} className="relative">
+                                <img
+                                  src={preview}
+                                  alt={`Preview ${index + 1}`}
+                                  className="w-full h-24 object-cover rounded-lg"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full"
+                                >
+                                  ×
+                                </button>
                               </div>
-                            )}
+                            ))}
                           </div>
+                        )}
+                      </div>
 
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-3">
-                              Upload Videos (Max 50MB each)
-                            </label>
-                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-purple-400 transition-colors">
-                              <input
-                                type="file"
-                                accept="video/*"
-                                multiple
-                                onChange={async (e) => {
-                                  const files = Array.from(e.target.files || []);
-                                  setVideoFiles(prev => [...prev, ...files]);
-                                  const newPreviews = await Promise.all(files.map(f => {
-                                    return URL.createObjectURL(f);
-                                  }));
-                                  setVideoPreviews(prev => [...prev, ...newPreviews]);
-                                }}
-                                className="hidden"
-                                id="video-upload"
-                              />
-                              <label htmlFor="video-upload" className="cursor-pointer">
-                                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                                  <span className="text-xl">🎥</span>
-                                </div>
-                                <p className="text-gray-600 mb-2">Click to upload videos</p>
-                                <p className="text-sm text-gray-500">MP4, MOV up to 50MB</p>
-                              </label>
-                            </div>
-                            {videoPreviews.length > 0 && (
-                              <div className="mt-4">
-                                <p className="text-sm font-medium text-gray-700 mb-2">
-                                  Selected Videos ({videoPreviews.length})
-                                </p>
-                                <div className="flex flex-wrap gap-3">
-                                  {videoPreviews.map((preview, index) => (
-                                    <div key={index} className="relative">
-                                      <video 
-                                        src={preview} 
-                                        className="w-28 h-20 object-cover rounded-lg border shadow-sm"
-                                        controls
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => removeVideo(index)}
-                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600"
-                                      >
-                                        ×
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
+                      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border border-indigo-100">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Videos (Optional)</h3>
+                        <input
+                          type="file"
+                          accept="video/*"
+                          multiple
+                          onChange={handleVideoUpload}
+                          className="hidden"
+                          id="video-upload"
+                        />
+                        <label
+                          htmlFor="video-upload"
+                          className="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-purple-400"
+                        >
+                          <span className="text-4xl">🎥</span>
+                          <p className="mt-2 text-gray-600">Click to upload videos</p>
+                        </label>
+                        {videoPreviews.length > 0 && (
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            {videoPreviews.map((preview, index) => (
+                              <div key={index} className="relative">
+                                <video src={preview} className="w-full h-24 object-cover rounded-lg" controls />
+                                <button
+                                  type="button"
+                                  onClick={() => removeVideo(index)}
+                                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full"
+                                >
+                                  ×
+                                </button>
                               </div>
-                            )}
+                            ))}
                           </div>
+                        )}
+                      </div>
+
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                          <p className="text-sm text-red-800">{error}</p>
                         </div>
-                      </div>
-                    </>
-                  )}
-
-                  {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 animate-pulse">
-                      <div className="flex items-center gap-2 text-red-800">
-                        <span>⚠️</span>
-                        <p className="text-sm font-medium">{error}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-4 pt-6">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                    >
-                      {loading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          Processing Donation...
-                        </span>
-                      ) : (
-                        <span className="flex items-center justify-center gap-2">
-                          <span>✨</span>
-                          Make Donation
-                        </span>
                       )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('donations')}
-                      className="px-6 py-4 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 shadow-lg"
+                      >
+                        {loading ? 'Submitting...' : 'Submit for Review'}
+                      </button>
+                    </form>
                   </div>
-                </form>
+                )}
+              </div>
+            )}
+
+            {/* History View - Combined Donations */}
+            {viewMode === 'history' && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">All Donation History</h2>
+
+                {/* Combined Donations List */}
+                <div className="space-y-4">
+                  {[...financialDonations.map(d => ({ ...d, type: 'financial' })), 
+                    ...itemDonations.map(d => ({ ...d, type: 'item' }))]
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                    .length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">📭</div>
+                      <p className="text-gray-500 text-lg">No donations yet</p>
+                      <p className="text-gray-400 text-sm mt-2">Start making a difference today!</p>
+                    </div>
+                  ) : (
+                    [...financialDonations.map(d => ({ ...d, type: 'financial' })), 
+                      ...itemDonations.map(d => ({ ...d, type: 'item' }))]
+                      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                      .map((donation) => {
+                        if (donation.type === 'financial') {
+                          return (
+                            <div
+                              key={donation._id}
+                              className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200"
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-2xl">💰</span>
+                                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                                      Financial
+                                    </span>
+                                  </div>
+                                  <h3 className="text-2xl font-bold text-green-600">
+                                    ₹{donation.amount?.toLocaleString()}
+                                  </h3>
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {new Date(donation.createdAt).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </p>
+                                  {donation.note && (
+                                    <p className="mt-2 text-gray-700 italic">{donation.note}</p>
+                                  )}
+                                </div>
+                                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                                  ✓ Completed
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-4">
+                                Transaction ID: {donation.transactionId}
+                              </p>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div
+                              key={donation._id}
+                              className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200"
+                            >
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-2xl">📦</span>
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                                      Item Donation
+                                    </span>
+                                  </div>
+                                  <h3 className="text-lg font-semibold text-gray-900">
+                                    {donation.category}
+                                  </h3>
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {new Date(donation.createdAt).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </p>
+                                </div>
+                                {getStatusBadge(donation)}
+                              </div>
+
+                              <div className="mb-3">
+                                <p className="text-sm font-medium text-gray-700 mb-1">Items:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {donation.items.map((item, index) => (
+                                    <span
+                                      key={index}
+                                      className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm"
+                                    >
+                                      {item}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {donation.description && (
+                                <p className="text-sm text-gray-700 mb-3">{donation.description}</p>
+                              )}
+
+                              {donation.rejectionReason && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                                  <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
+                                  <p className="text-sm text-red-700">{donation.rejectionReason}</p>
+                                </div>
+                              )}
+
+                              {donation.acceptedBy && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                                  <p className="text-sm font-medium text-green-800">
+                                    Accepted by: {donation.acceptedBy.userName}
+                                  </p>
+                                  <p className="text-sm text-green-700">
+                                    Contact: {donation.acceptedBy.phone || donation.acceptedBy.email}
+                                  </p>
+                                </div>
+                              )}
+
+                              {donation.images && donation.images.length > 0 && (
+                                <div className="mt-4">
+                                  <p className="text-sm font-medium text-gray-700 mb-2">Images:</p>
+                                  <div className="flex gap-2 overflow-x-auto pb-2">
+                                    {donation.images.map((img, index) => (
+                                      <img
+                                        key={index}
+                                        src={img.url}
+                                        alt={`Item ${index + 1}`}
+                                        className="w-24 h-24 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={() => window.open(img.url, '_blank')}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                      })
+                  )}
+                </div>
               </div>
             )}
           </div>
