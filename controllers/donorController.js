@@ -132,7 +132,6 @@ export const createDonation = async (request) => {
 
     // Save and minimal debug to confirm success
     const savedDonation = await donation.save();
-    console.debug('createDonation - saved donation id:', savedDonation._id, ' donor:', String(savedDonation.donor));
 
     return { success: true, message: 'Donation created', donation: savedDonation, status: 201 };
   } catch (err) {
@@ -146,13 +145,6 @@ export const getDonorDonations = async (request) => {
   try {
     const auth = await protect(request);
     if (!auth.success) return auth;
-
-    // Debug: log auth shape to help trace errors during development
-    console.debug('getDonorDonations - auth result:', {
-      success: auth.success,
-      userId: String(auth.userId),
-      userPresent: !!auth.user,
-    });
 
     await dbConnect();
 
@@ -193,7 +185,8 @@ export const getNgoDonations = async (request) => {
 
 
 
-export default {
+const donorControllerExports = {
   createDonation,
-
 };
+
+export default donorControllerExports;

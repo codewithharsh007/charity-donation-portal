@@ -11,7 +11,7 @@ export default function AdminDashboard() {
   const [verifications, setVerifications] = useState([]);
   const [filteredVerifications, setFilteredVerifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('pending'); // pending, accepted, rejected, all
+  const [filter, setFilter] = useState('all'); // all, pending, accepted, rejected
   const [selectedVerification, setSelectedVerification] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -212,39 +212,17 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black px-4 py-8">
       <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
-            <p className="mt-2 text-gray-400">NGO Verification Management</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="rounded-lg bg-gray-700 px-6 py-3 text-white transition-all hover:bg-gray-600"
-            >
-              Home
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="rounded-lg bg-red-600 px-6 py-3 text-white transition-all hover:bg-red-700"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-
         {/* Filters */}
         <div className="mb-6 flex gap-4">
           <button
-            onClick={() => setFilter('pending')}
+            onClick={() => setFilter('all')}
             className={`rounded-lg px-6 py-3 font-semibold transition-all ${
-              filter === 'pending'
-                ? 'bg-yellow-600 text-white'
+              filter === 'all'
+                ? 'bg-blue-600 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
-            Pending
+            All
           </button>
           <button
             onClick={() => setFilter('accepted')}
@@ -267,41 +245,58 @@ export default function AdminDashboard() {
             Rejected
           </button>
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => setFilter('pending')}
             className={`rounded-lg px-6 py-3 font-semibold transition-all ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
+              filter === 'pending'
+                ? 'bg-yellow-600 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
-            All
+            Pending
           </button>
         </div>
 
         {/* Stats */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
-          <div className="rounded-2xl bg-gradient-to-br from-yellow-500 to-yellow-600 p-6 shadow-xl">
-            <h3 className="text-sm font-medium text-yellow-100">Pending</h3>
-            <p className="mt-2 text-3xl font-bold text-white">
-              {verifications.filter((v) => v.verificationStatus === 'pending').length}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-gradient-to-br from-green-500 to-green-600 p-6 shadow-xl">
-            <h3 className="text-sm font-medium text-green-100">Accepted</h3>
-            <p className="mt-2 text-3xl font-bold text-white">
-              {verifications.filter((v) => v.verificationStatus === 'accepted').length}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-gradient-to-br from-red-500 to-red-600 p-6 shadow-xl">
-            <h3 className="text-sm font-medium text-red-100">Rejected</h3>
-            <p className="mt-2 text-3xl font-bold text-white">
-              {verifications.filter((v) => v.verificationStatus === 'rejected').length}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 shadow-xl">
-            <h3 className="text-sm font-medium text-blue-100">Total</h3>
-            <p className="mt-2 text-3xl font-bold text-white">{verifications.length}</p>
-          </div>
+          {(filter === 'all' || filter === 'pending') && (
+            <button
+              onClick={() => setFilter('pending')}
+              className="rounded-2xl bg-gradient-to-br from-yellow-500 to-yellow-600 p-6 shadow-xl text-left transition-transform hover:scale-105 cursor-pointer"
+            >
+              <h3 className="text-sm font-medium text-yellow-100">Pending</h3>
+              <p className="mt-2 text-3xl font-bold text-white">
+                {verifications.filter((v) => v.verificationStatus === 'pending').length}
+              </p>
+            </button>
+          )}
+          {(filter === 'all' || filter === 'accepted') && (
+            <button
+              onClick={() => setFilter('accepted')}
+              className="rounded-2xl bg-gradient-to-br from-green-500 to-green-600 p-6 shadow-xl text-left transition-transform hover:scale-105 cursor-pointer"
+            >
+              <h3 className="text-sm font-medium text-green-100">Accepted</h3>
+              <p className="mt-2 text-3xl font-bold text-white">
+                {verifications.filter((v) => v.verificationStatus === 'accepted').length}
+              </p>
+            </button>
+          )}
+          {(filter === 'all' || filter === 'rejected') && (
+            <button
+              onClick={() => setFilter('rejected')}
+              className="rounded-2xl bg-gradient-to-br from-red-500 to-red-600 p-6 shadow-xl text-left transition-transform hover:scale-105 cursor-pointer"
+            >
+              <h3 className="text-sm font-medium text-red-100">Rejected</h3>
+              <p className="mt-2 text-3xl font-bold text-white">
+                {verifications.filter((v) => v.verificationStatus === 'rejected').length}
+              </p>
+            </button>
+          )}
+          {filter === 'all' && (
+            <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 shadow-xl">
+              <h3 className="text-sm font-medium text-blue-100">Total</h3>
+              <p className="mt-2 text-3xl font-bold text-white">{verifications.length}</p>
+            </div>
+          )}
         </div>
 
         {/* Verifications List */}

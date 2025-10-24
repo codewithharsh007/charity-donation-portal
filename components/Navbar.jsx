@@ -35,6 +35,11 @@ export default function Navbar() {
     };
   }, [pathname]); // Re-check when route changes
 
+  // Hide navbar on admin pages
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
+
   // Don't show navbar for admin users
   // (removed stray redirect logic) Navbar should not auto-redirect — login handler controls navigation
   const dashboardPath = user ? (user.role || user.userType) === 'ngo' ? '/ngoDashboard' : (user.role || user.userType) === 'admin' ? '/admin' : '/donorDashboard' : '/profile';

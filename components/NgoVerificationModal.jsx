@@ -271,7 +271,7 @@ export default function NgoVerificationModal() {
                 locationAddress: geoData.display_name || '',
               }));
             } catch (err) {
-              console.log('Could not get address from coordinates');
+              console.error('Could not get address from coordinates');
             }
 
             setSuccess('NGO image uploaded with location!');

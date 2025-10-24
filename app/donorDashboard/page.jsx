@@ -390,20 +390,28 @@ export default function DonorDashboardPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {!isEditingProfile ? (
-                    <button
-                      onClick={() => setIsEditingProfile(true)}
-                      className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-md border border-blue-100"
-                    >
-                      Edit
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setIsEditingProfile(true)}
+                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                      >
+                        Edit Profile
+                      </button>
+                      <button
+                        onClick={() => setIsProfileOpen(false)}
+                        className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+                      >
+                        Close
+                      </button>
+                    </>
                   ) : (
                     <>
                       <button
                         onClick={handleProfileSave}
                         disabled={profileLoading}
-                        className="px-3 py-1 text-sm bg-green-600 text-white rounded-md"
+                        className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors disabled:opacity-50"
                       >
-                        {profileLoading ? 'Saving...' : 'Save'}
+                        {profileLoading ? 'Saving...' : 'Save Changes'}
                       </button>
                       <button
                         onClick={() => { setIsEditingProfile(false); setProfileForm({
@@ -415,18 +423,12 @@ export default function DonorDashboardPage() {
                           state: profile?.state || '',
                           pincode: profile?.pincode || ''
                         }); }}
-                        className="px-3 py-1 text-sm bg-white border rounded-md"
+                        className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
                       >
                         Cancel
                       </button>
                     </>
                   )}
-                  <button
-                    onClick={() => setIsProfileOpen(false)}
-                    className="px-3 py-1 text-sm bg-white border rounded-md"
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
 

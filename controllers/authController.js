@@ -167,10 +167,8 @@ export const register = async (userData) => {
       pincode,
       role: userType, // Set role same as userType for now
     });
-
    
     await user.save();
-
 
     otpStore.delete(email); // Clean up OTP store
 

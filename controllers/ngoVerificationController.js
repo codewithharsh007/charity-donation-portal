@@ -7,6 +7,7 @@ export const submitVerification = async (userId, verificationData) => {
   try {
     // Check if user exists and is NGO
     const user = await User.findById(userId);
+    
     if (!user || user.userType !== 'ngo') {
       return {
         success: false,

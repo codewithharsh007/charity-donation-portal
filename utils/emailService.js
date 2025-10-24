@@ -56,12 +56,11 @@ const sendorgEmail = async (to, subject, otp) => {
   try {
     // Validate environment variables. If missing, fall back to logging the OTP in dev
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      // eslint-disable-next-line no-console
       console.warn('EMAIL_USER or EMAIL_PASS not set — falling back to console logging the OTP (development only)');
       // For development convenience, print OTP to console and return the OTP
       // so flows that depend on OTP can work without a real SMTP provider.
       // NOTE: In production, ensure EMAIL_USER and EMAIL_PASS are set.
-      // eslint-disable-next-line no-console
+
       console.log(`(DEV) OTP for ${to}: ${otp}`);
       return { sent: true, devOtp: otp };
     }
