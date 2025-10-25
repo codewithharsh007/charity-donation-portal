@@ -23,7 +23,8 @@ export async function POST(request, { params }) {
     }
 
     const { id } = params;
-    const { rejectionReason } = await request.json();
+    const body = await request.json();
+    const rejectionReason = body.reason || body.rejectionReason;
 
     const result = await rejectItemDonation(id, auth.userId, rejectionReason);
 

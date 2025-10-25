@@ -31,7 +31,6 @@ export async function POST(request) {
       { status: result.status }
     );
   } catch (error) {
-    console.error('Create item donation error:', error);
     return NextResponse.json(
       { success: false, message: 'Server error', error: error.message },
       { status: 500 }
@@ -50,16 +49,21 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type'); // 'donor', 'ngo-available', 'ngo-accepted'
+    const type = searchParams.get('type'); // 'donor', 'ngo'
+    const filter = searchParams.get('filter'); // 'available', 'accepted'
 
     let result;
     
-    if (type === 'ngo-available') {
-      // NGO viewing available items
-      result = await getAvailableItemsForNGOs();
-    } else if (type === 'ngo-accepted') {
-      // NGO viewing their accepted items
-      result = await getNGOAcceptedDonations(auth.userId);
+    if (type === 'ngo') {
+      if (filter === 'available') {
+        // NGO viewing available items - filtered by their state
+        result = await getAvailableItemsForNGOs(auth.userId);
+      } else if (filter === 'accepted') {
+        // NGO viewing their accepted items
+        result = await getNGOAcceptedDonations(auth.userId);
+      } else {
+        result = await getAvailableItemsForNGOs(auth.userId);
+      }
     } else {
       // Donor viewing their donations
       result = await getDonorItemDonations(auth.userId);
@@ -74,7 +78,6 @@ export async function GET(request) {
       { status: result.status }
     );
   } catch (error) {
-    console.error('Get item donations error:', error);
     return NextResponse.json(
       { success: false, message: 'Server error', error: error.message },
       { status: 500 }

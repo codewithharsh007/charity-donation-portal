@@ -149,7 +149,8 @@ export const approveItemDonation = async (donationId, adminId) => {
     donation.isActive = true;
     donation.adminReviewedBy = adminId;
     donation.adminReviewedAt = Date.now();
-    donation.deliveryStatus = 'not_picked_up';
+    donation.deliveryStatus = 'pending'; // Keep as pending until NGO accepts
+    donation.rejectionReason = null; // Clear rejection reason if re-approved
 
     await donation.save();
 
@@ -225,6 +226,9 @@ export const rejectItemDonation = async (donationId, adminId, rejectionReason) =
     donation.adminReviewedBy = adminId;
     donation.adminReviewedAt = Date.now();
     donation.rejectionReason = rejectionReason;
+    donation.deliveryStatus = 'pending'; // Reset delivery status for rejected items
+    donation.acceptedBy = null; // Clear acceptedBy if it exists
+    donation.acceptedAt = null; // Clear acceptedAt if it exists
 
     await donation.save();
 
@@ -269,14 +273,42 @@ export const rejectItemDonation = async (donationId, adminId, rejectionReason) =
   }
 };
 
-// Get available items for NGOs (approved and active)
-export const getAvailableItemsForNGOs = async () => {
+// Get available items for NGOs (approved and active) - filtered by NGO's state
+export const getAvailableItemsForNGOs = async (ngoId = null) => {
   try {
-    const donations = await ItemDonation.find({
+    let query = {
       adminStatus: 'approved',
       isActive: true,
       acceptedBy: null,
-    })
+    };
+
+    // If NGO ID is provided, filter by state
+    if (ngoId) {
+      const ngo = await User.findById(ngoId).select('state');
+      if (ngo && ngo.state) {
+        // Find donations where donor's state matches NGO's state
+        const donations = await ItemDonation.find(query)
+          .sort({ createdAt: -1 })
+          .populate({
+            path: 'donor',
+            select: 'userName phone address city state',
+            match: { state: ngo.state } // Filter by matching state
+          });
+
+        // Filter out null donors (where state didn't match)
+        const filteredDonations = donations.filter(d => d.donor !== null);
+
+        return {
+          success: true,
+          donations: filteredDonations,
+          count: filteredDonations.length,
+          status: 200,
+        };
+      }
+    }
+
+    // Fallback: if no NGO ID or no state, return all
+    const donations = await ItemDonation.find(query)
       .sort({ createdAt: -1 })
       .populate('donor', 'userName phone address city state');
 
@@ -287,7 +319,6 @@ export const getAvailableItemsForNGOs = async () => {
       status: 200,
     };
   } catch (err) {
-    console.error('Get available items for NGOs error:', err);
     return {
       success: false,
       message: 'Server error',

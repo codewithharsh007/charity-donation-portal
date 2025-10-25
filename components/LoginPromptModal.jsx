@@ -4,15 +4,25 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-export default function LoginPromptModal() {
+export default function LoginPromptModal({ 
+  isOpen = null, 
+  onClose = null, 
+  message = null,
+  disableTimer = false 
+}) {
   const router = useRouter();
   const modalBackdropRef = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // If isOpen prop is provided, use it (controlled mode)
+  // Otherwise use internal state (timer mode)
+  const isModalOpen = isOpen !== null ? isOpen : showModal;
+  const closeModal = onClose || (() => setShowModal(false));
+
   // Lock body scroll when modal is shown
   useEffect(() => {
-    if (showModal) {
+    if (isModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -20,9 +30,14 @@ export default function LoginPromptModal() {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showModal]);
+  }, [isModalOpen]);
 
   useEffect(() => {
+    // Skip timer logic if disableTimer is true or component is controlled
+    if (disableTimer || isOpen !== null) {
+      return;
+    }
+
     // Check if user is logged in
     const checkLoginStatus = () => {
       const userData = localStorage.getItem('user');
@@ -75,12 +90,15 @@ export default function LoginPromptModal() {
       clearTimeout(timer);
       window.removeEventListener('userLoggedIn', handleLogin);
     };
-  }, []);
+  }, [disableTimer, isOpen]);
 
   const handleSkip = () => {
-    setShowModal(false);
-    localStorage.setItem('loginPromptSkipped', 'true');
-    localStorage.setItem('loginPromptSkipTime', Date.now().toString());
+    closeModal();
+    // Only set skip timestamp if in timer mode (not manually triggered)
+    if (isOpen === null) {
+      localStorage.setItem('loginPromptSkipped', 'true');
+      localStorage.setItem('loginPromptSkipTime', Date.now().toString());
+    }
   };
 
   const handleLogin = () => {
@@ -91,9 +109,23 @@ export default function LoginPromptModal() {
     router.push('/register');
   };
 
-  if (!showModal || isLoggedIn) {
+  // Don't show if not open
+  // In manual mode (isOpen !== null): only check isModalOpen
+  // In timer mode (isOpen === null): check both isModalOpen and isLoggedIn
+  if (!isModalOpen) {
     return null;
   }
+  
+  if (isOpen === null && isLoggedIn) {
+    return null;
+  }
+
+  // Default messages based on mode
+  const defaultMessage = message || (isOpen !== null 
+    ? "Please login to continue" 
+    : "Create an account to make a difference! Track your donations, connect with NGOs, and help those in need.");
+  
+  const title = message ? "Login Required" : "Join Our Community";
 
   return (
     <>
@@ -101,6 +133,7 @@ export default function LoginPromptModal() {
       <div 
         ref={modalBackdropRef}
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-scroll"
+        onClick={onClose ? handleSkip : undefined}
         style={{
           scrollbarColor: '#ef4444 transparent',
           scrollbarWidth: 'thin'
@@ -108,12 +141,15 @@ export default function LoginPromptModal() {
       >
         <div className="min-h-screen flex items-center justify-center py-8 px-4">
           {/* Modal */}
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-8 relative border border-gray-700 animate-fadeIn">
+          <div 
+            className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-8 relative border border-gray-700 animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
           {/* Close/Skip Button */}
           <button
             onClick={handleSkip}
             className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-            aria-label="Skip"
+            aria-label={onClose ? "Close" : "Skip"}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -154,10 +190,10 @@ export default function LoginPromptModal() {
           {/* Content */}
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-white mb-3">
-              Join Our Community
+              {title}
             </h2>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Create an account to make a difference! Track your donations, connect with NGOs, and help those in need.
+              {defaultMessage}
             </p>
           </div>
 
@@ -181,7 +217,7 @@ export default function LoginPromptModal() {
               onClick={handleSkip}
               className="w-full text-gray-400 py-2 text-sm hover:text-white transition-colors"
             >
-              Maybe Later
+              {onClose ? "Cancel" : "Maybe Later"}
             </button>
           </div>
           </div>
