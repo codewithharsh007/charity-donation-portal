@@ -189,6 +189,13 @@ const ngoVerificationSchema = new mongoose.Schema(
     reminderSentAt: {
       type: Date,
     },
+    // Subscription tier (set after verification)
+    subscriptionTier: {
+      type: Number,
+      default: 1, // Start with FREE
+      min: 1,
+      max: 4,
+    },
   },
   {
     timestamps: true,

@@ -14,6 +14,25 @@ const itemDonationSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ItemCategory',
+  },
+  itemValue: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  requiredTier: {
+    type: Number,
+    default: 1,
+    min: 1,
+    max: 4,
+  },
+  isHiddenCategory: {
+    type: Boolean,
+    default: false,
+  },
   description: {
     type: String,
     trim: true,

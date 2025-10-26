@@ -27,6 +27,23 @@ const financialDonationSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  // NGO allocation fields (for future distribution)
+  allocatedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  allocationAmount: {
+    type: Number,
+    min: 0,
+  },
+  allocationDate: {
+    type: Date,
+  },
+  allocationStatus: {
+    type: String,
+    enum: ['pending', 'disbursed', 'completed'],
+    default: 'pending',
+  },
 }, { timestamps: true });
 
 const FinancialDonation = mongoose.models.FinancialDonation || mongoose.model('FinancialDonation', financialDonationSchema);

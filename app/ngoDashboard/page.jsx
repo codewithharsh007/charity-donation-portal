@@ -1,7 +1,8 @@
+// app/ngoDashboard/page.jsx
 "use client";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Mail, Phone, MapPin, Edit2, Heart, TrendingUp, Package, DollarSign } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Edit2, Heart, TrendingUp, Package, DollarSign, Crown, BarChart, Zap } from 'lucide-react';
 
 export default function NgoDashboardPage() {
   const [donations, setDonations] = useState([]);
@@ -13,6 +14,7 @@ export default function NgoDashboardPage() {
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [subscriptionData, setSubscriptionData] = useState(null);
   
   // Profile UI state
   const [profile, setProfile] = useState(null);
@@ -34,6 +36,7 @@ export default function NgoDashboardPage() {
     fetchDonations();
     fetchVerificationStatus();
     fetchProfile();
+    fetchSubscription();
   }, []);
 
   const fetchDonations = async () => {
@@ -75,6 +78,20 @@ export default function NgoDashboardPage() {
       }
     } catch (err) {
       console.error('Error fetching verification status:', err);
+    }
+  };
+
+  const fetchSubscription = async () => {
+    try {
+      const res = await fetch('/api/subscriptions/current', {
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSubscriptionData(data.data); // ✅ Store the subscription data
+      }
+    } catch (err) {
+      console.error('Error fetching subscription:', err);
     }
   };
 
@@ -257,6 +274,19 @@ export default function NgoDashboardPage() {
     items: donations.filter(d => d.ngoType === 'items').length,
   };
 
+  // ✅ Get current tier info
+  const currentTier = subscriptionData?.currentTier || 1;
+  const tierName = subscriptionData?.tierName || 'FREE';
+  const getTierBadgeColor = (tier) => {
+    switch (tier) {
+      case 1: return 'bg-gray-500/20 text-gray-300';
+      case 2: return 'bg-amber-600/20 text-amber-300';
+      case 3: return 'bg-gray-400/20 text-gray-200';
+      case 4: return 'bg-yellow-500/20 text-yellow-300';
+      default: return 'bg-gray-500/20 text-gray-300';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800">
       {/* Header - Matching Navbar */}
@@ -307,6 +337,13 @@ export default function NgoDashboardPage() {
               <div className="flex items-center gap-2">
                 {getVerificationStatusBadge()}
               </div>
+              <button
+                onClick={() => router.push('/subscription/plans')}
+                className="px-5 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Subscription
+              </button>
               {isVerified() ? (
                 <button
                   onClick={() => router.push('/ngo/marketplace')}
@@ -348,6 +385,16 @@ export default function NgoDashboardPage() {
                 <div className="mb-2">
                   {getVerificationStatusBadge()}
                 </div>
+                <button
+                  onClick={() => {
+                    router.push('/subscription/plans');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors text-center flex items-center justify-center gap-2"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Subscription
+                </button>
                 {isVerified() ? (
                   <button
                     onClick={() => {
@@ -396,7 +443,72 @@ export default function NgoDashboardPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Stats Cards */}
+        {/* ✅ UPDATED Subscription Status Card with Tier-Based Features */}
+        {subscriptionData && (
+          <div className={`mb-6 bg-gradient-to-r rounded-2xl p-6 shadow-lg ${
+            currentTier === 4 ? 'from-yellow-600 to-orange-600' :
+            currentTier === 3 ? 'from-gray-400 to-gray-600' :
+            currentTier === 2 ? 'from-amber-600 to-amber-800' :
+            'from-gray-600 to-gray-700'
+          }`}>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
+                  {currentTier === 4 ? (
+                    <Crown className="w-8 h-8 text-white" />
+                  ) : currentTier === 3 ? (
+                    <Zap className="w-8 h-8 text-white" />
+                  ) : currentTier === 2 ? (
+                    <BarChart className="w-8 h-8 text-white" />
+                  ) : (
+                    <Package className="w-8 h-8 text-white" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-2xl font-bold text-white">{tierName} Tier</h3>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${getTierBadgeColor(currentTier)} border border-white/30`}>
+                      {currentTier === 4 ? '👑 PREMIUM' : currentTier === 3 ? '⚡ PRO' : currentTier === 2 ? '🥉 STARTER' : '🆓 FREE'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-white/80">
+                    {currentTier === 4 ? 'Unlimited features & priority support' :
+                     currentTier === 3 ? 'Advanced features unlocked' :
+                     currentTier === 2 ? 'Essential features enabled' :
+                     'Basic features only'}
+                  </p>
+                  {subscriptionData.plan && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/70">
+                      <span>• {subscriptionData.plan.limits?.activeRequests === -1 ? '∞' : subscriptionData.plan.limits?.activeRequests} Active Requests</span>
+                      <span>• {subscriptionData.plan.limits?.monthlyAcceptance === -1 ? '∞' : subscriptionData.plan.limits?.monthlyAcceptance} Monthly Items</span>
+                      {subscriptionData.plan.limits?.financialDonationLimit > 0 && (
+                        <span>• ₹{subscriptionData.plan.limits.financialDonationLimit.toLocaleString()} Financial Limit</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {currentTier < 4 && (
+                  <button
+                    onClick={() => router.push('/subscription/plans')}
+                    className="px-5 py-2.5 bg-white text-purple-600 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors shadow-lg"
+                  >
+                    ⬆️ Upgrade
+                  </button>
+                )}
+                <button
+                  onClick={() => router.push('/ngoDashboard/subscription')}
+                  className="px-5 py-2.5 bg-white/20 text-white rounded-lg text-sm font-semibold hover:bg-white/30 transition-colors"
+                >
+                  Manage
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Stats Cards - Show different stats based on tier */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Total Received */}
           <div className="bg-[#1e293b] border border-gray-700/50 rounded-2xl p-6 hover:border-gray-600 transition-all">
@@ -410,6 +522,15 @@ export default function NgoDashboardPage() {
                 <TrendingUp className="w-6 h-6 text-green-400" />
               </div>
             </div>
+            {currentTier > 1 && (
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <p className="text-xs text-gray-400">
+                  {currentTier === 4 ? '✨ Premium Analytics Available' :
+                   currentTier === 3 ? '📊 Advanced Tracking Enabled' :
+                   '📈 Basic Stats Only'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Items Received */}
@@ -424,6 +545,13 @@ export default function NgoDashboardPage() {
                 <Package className="w-6 h-6 text-blue-400" />
               </div>
             </div>
+            {subscriptionData?.plan && (
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <p className="text-xs text-gray-400">
+                  Limit: {subscriptionData.plan.limits?.monthlyAcceptance === -1 ? '∞ Unlimited' : `${subscriptionData.plan.limits?.monthlyAcceptance}/month`}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Total Donors */}
@@ -438,8 +566,38 @@ export default function NgoDashboardPage() {
                 <Heart className="w-6 h-6 text-purple-400" />
               </div>
             </div>
+            {currentTier > 2 && (
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <p className="text-xs text-gray-400">
+                  {currentTier === 4 ? '👥 Priority Donor Matching' : '🤝 Enhanced Donor Reach'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Tier-specific feature alert */}
+        {currentTier === 1 && (
+          <div className="mb-6 bg-purple-500/10 border border-purple-500/30 rounded-2xl p-6 backdrop-blur-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <span className="text-3xl">🚀</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-purple-400 mb-2">Unlock Premium Features</h3>
+                <p className="text-purple-300 mb-4">
+                  Upgrade to access unlimited requests, advanced analytics, priority support, and more!
+                </p>
+                <button
+                  onClick={() => router.push('/subscription/plans')}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors"
+                >
+                  View Plans
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Your Profile Section */}
         <div className="bg-[#1e293b] border border-gray-700/50 rounded-2xl p-6 mb-8">

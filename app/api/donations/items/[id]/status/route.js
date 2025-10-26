@@ -12,7 +12,8 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ message: auth.message }, { status: auth.status });
     }
 
-    const { id } = params;
+    // ✅ FIX: Await params in Next.js 15
+    const { id } = await params;
     const { status } = await request.json();
 
     const result = await updateDeliveryStatus(id, auth.userId, status);

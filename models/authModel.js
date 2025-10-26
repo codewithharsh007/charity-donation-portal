@@ -70,6 +70,36 @@ const userSchema = new mongoose.Schema(
       enum: ['donor', 'ngo', 'admin'],
       default: 'donor',
     },
+    // Subscription fields for NGOs
+    subscription: {
+      currentTier: {
+        type: Number,
+        default: 1, // FREE tier
+        min: 1,
+        max: 4,
+      },
+      tierName: {
+        type: String,
+        default: 'FREE',
+        enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD'],
+      },
+      subscriptionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'NgoSubscription',
+      },
+      status: {
+        type: String,
+        enum: ['active', 'trial', 'expired', 'cancelled'],
+        default: 'active', // FREE is always active
+      },
+      expiresAt: {
+        type: Date, // null for FREE tier
+      },
+      trialUsed: {
+        type: Boolean,
+        default: false,
+      },
+    },
   },
   {
     timestamps: true,

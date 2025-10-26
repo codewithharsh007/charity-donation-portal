@@ -1,6 +1,8 @@
-import ItemDonation from '../models/itemDonationModel.js';
-import User from '../models/authModel.js';
-import sendorgEmail from '../utils/emailService.js';
+import ItemDonation from "../models/itemDonationModel.js";
+import User from "../models/authModel.js";
+import sendorgEmail from "../utils/emailService.js";
+import ItemCategory from "../models/itemCategoryModel.js";
+import NGOSubscription from "../models/ngoSubscriptionModel.js";
 
 // Create item donation
 export const createItemDonation = async (userId, donationData) => {
@@ -9,10 +11,112 @@ export const createItemDonation = async (userId, donationData) => {
     if (!user) {
       return {
         success: false,
-        message: 'User not found',
+        message: "User not found",
         status: 404,
       };
     }
+
+    // ✅ ACCURATE TIER DETECTION based on tier structure and items
+    const getTierFromCategory = (category, items = []) => {
+      const cat = category.toLowerCase();
+      const itemsStr = items.join(" ").toLowerCase();
+
+      // Helper function to check for whole word match
+      const hasWholeWord = (text, word) => {
+        const regex = new RegExp(`\\b${word}\\b`, "i");
+        return regex.test(text);
+      };
+
+      // Tier 4 (GOLD) - High-value electronics, vehicles, industrial equipment
+      if (
+        cat.includes("high-value electronics") ||
+        cat.includes("vehicles") ||
+        cat.includes("bicycle / vehicle") ||
+        cat.includes("power tools") ||
+        cat.includes("specialized medical") ||
+        cat.includes("land") ||
+        cat.includes("property") ||
+        cat.includes("industrial") ||
+        hasWholeWord(itemsStr, "laptop") ||
+        hasWholeWord(itemsStr, "computer") ||
+        hasWholeWord(itemsStr, "desktop") ||
+        hasWholeWord(itemsStr, "server") ||
+        hasWholeWord(itemsStr, "car") || // ✅ Now won't match "cards"
+        hasWholeWord(itemsStr, "motorcycle") ||
+        hasWholeWord(itemsStr, "vehicle") ||
+        hasWholeWord(itemsStr, "truck") ||
+        hasWholeWord(itemsStr, "van") ||
+        hasWholeWord(itemsStr, "bicycle") ||
+        hasWholeWord(itemsStr, "bike") // ✅ Won't match "bikes" in category name
+      ) {
+        return 4;
+      }
+
+      // Tier 3 (SILVER) - Basic electronics, large items, hidden categories
+      if (
+        cat.includes("electronics") ||
+        cat.includes("basic electronics") ||
+        cat.includes("large furniture") ||
+        cat.includes("medical equipment") ||
+        cat.includes("commercial kitchen") ||
+        cat.includes("hospital beds") ||
+        cat.includes("construction") ||
+        cat.includes("agriculture") ||
+        hasWholeWord(itemsStr, "tv") ||
+        itemsStr.includes("television") ||
+        itemsStr.includes("refrigerator") ||
+        itemsStr.includes("fridge") ||
+        itemsStr.includes("washing machine") ||
+        itemsStr.includes("microwave") ||
+        hasWholeWord(itemsStr, "ac") ||
+        itemsStr.includes("air conditioner") ||
+        hasWholeWord(itemsStr, "mobile") ||
+        hasWholeWord(itemsStr, "phone") ||
+        hasWholeWord(itemsStr, "tablet")
+      ) {
+        return 3;
+      }
+
+      // Tier 2 (BRONZE) - Clothing, toys, furniture, sports, medical basic
+      if (
+        cat.includes("clothing") ||
+        cat.includes("clothes") ||
+        cat.includes("textiles") ||
+        cat.includes("toys") ||
+        cat.includes("games") ||
+        cat.includes("basic furniture") ||
+        cat.includes("furniture") ||
+        cat.includes("sports") ||
+        cat.includes("medical supplies (basic)") ||
+        cat.includes("medicines") ||
+        cat.includes("health kits") ||
+        cat.includes("kitchen equipment") ||
+        itemsStr.includes("shirt") ||
+        itemsStr.includes("pant") ||
+        itemsStr.includes("dress") ||
+        itemsStr.includes("shoe") ||
+        hasWholeWord(itemsStr, "toy") ||
+        hasWholeWord(itemsStr, "card") || // ✅ Add this to catch "cards" as tier 2
+        hasWholeWord(itemsStr, "cards") ||
+        itemsStr.includes("doll") ||
+        itemsStr.includes("chair") ||
+        itemsStr.includes("table") ||
+        itemsStr.includes("medicine")
+      ) {
+        return 2;
+      }
+
+      // Tier 1 (FREE) - Basic items (default)
+      // Books, Food, Stationery, Household Items, School Supplies
+      return 1;
+    };
+
+    const requiredTier = getTierFromCategory(
+      donationData.category,
+      donationData.items,
+    );
+
+    
 
     const donation = new ItemDonation({
       donor: userId,
@@ -24,6 +128,7 @@ export const createItemDonation = async (userId, donationData) => {
       pickupAddress: donationData.pickupAddress || user.address,
       pickupPhone: donationData.pickupPhone || user.phone,
       donorNotes: donationData.donorNotes,
+      requiredTier: requiredTier, // ✅ AUTO-ASSIGNED TIER
     });
 
     await donation.save();
@@ -31,7 +136,7 @@ export const createItemDonation = async (userId, donationData) => {
     // Send confirmation email
     await sendorgEmail(
       user.email,
-      'Item Donation Submitted for Review 📦',
+      "Item Donation Submitted for Review 📦",
       `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #3b82f6;">Item Donation Submitted!</h2>
@@ -42,7 +147,7 @@ export const createItemDonation = async (userId, donationData) => {
           <p style="margin: 0;"><strong>Donation Details:</strong></p>
           <ul style="margin: 10px 0;">
             <li>Category: ${donation.category}</li>
-            <li>Items: ${donation.items.join(', ')}</li>
+            <li>Items: ${donation.items.join(", ")}</li>
             <li>Status: Pending Admin Approval</li>
             <li>Submitted: ${new Date().toLocaleString()}</li>
           </ul>
@@ -61,20 +166,20 @@ export const createItemDonation = async (userId, donationData) => {
           Charity Platform Team
         </p>
       </div>
-      `
+      `,
     );
 
     return {
       success: true,
-      message: 'Item donation submitted for admin review',
+      message: "Item donation submitted for admin review",
       donation,
       status: 201,
     };
   } catch (err) {
-    console.error('Create item donation error:', err);
+    console.error("Create item donation error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };
@@ -86,8 +191,8 @@ export const getDonorItemDonations = async (userId) => {
   try {
     const donations = await ItemDonation.find({ donor: userId })
       .sort({ createdAt: -1 })
-      .populate('donor', 'userName email')
-      .populate('acceptedBy', 'userName email phone');
+      .populate("donor", "userName email")
+      .populate("acceptedBy", "userName email phone");
 
     return {
       success: true,
@@ -96,10 +201,10 @@ export const getDonorItemDonations = async (userId) => {
       status: 200,
     };
   } catch (err) {
-    console.error('Get donor item donations error:', err);
+    console.error("Get donor item donations error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };
@@ -111,9 +216,9 @@ export const getItemDonationsForAdmin = async (filter = {}) => {
   try {
     const donations = await ItemDonation.find(filter)
       .sort({ createdAt: -1 })
-      .populate('donor', 'userName email phone address')
-      .populate('acceptedBy', 'userName email phone')
-      .populate('adminReviewedBy', 'userName email');
+      .populate("donor", "userName email phone address")
+      .populate("acceptedBy", "userName email phone")
+      .populate("adminReviewedBy", "userName email");
 
     return {
       success: true,
@@ -122,10 +227,10 @@ export const getItemDonationsForAdmin = async (filter = {}) => {
       status: 200,
     };
   } catch (err) {
-    console.error('Get item donations for admin error:', err);
+    console.error("Get item donations for admin error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };
@@ -135,21 +240,24 @@ export const getItemDonationsForAdmin = async (filter = {}) => {
 // Admin approve item donation
 export const approveItemDonation = async (donationId, adminId) => {
   try {
-    const donation = await ItemDonation.findById(donationId).populate('donor', 'userName email');
-    
+    const donation = await ItemDonation.findById(donationId).populate(
+      "donor",
+      "userName email",
+    );
+
     if (!donation) {
       return {
         success: false,
-        message: 'Donation not found',
+        message: "Donation not found",
         status: 404,
       };
     }
 
-    donation.adminStatus = 'approved';
+    donation.adminStatus = "approved";
     donation.isActive = true;
     donation.adminReviewedBy = adminId;
     donation.adminReviewedAt = Date.now();
-    donation.deliveryStatus = 'pending'; // Keep as pending until NGO accepts
+    donation.deliveryStatus = "pending"; // Keep as pending until NGO accepts
     donation.rejectionReason = null; // Clear rejection reason if re-approved
 
     await donation.save();
@@ -157,7 +265,7 @@ export const approveItemDonation = async (donationId, adminId) => {
     // Send approval email to donor
     await sendorgEmail(
       donation.donor.email,
-      'Item Donation Approved! ✅',
+      "Item Donation Approved! ✅",
       `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #10b981;">Your Donation Has Been Approved! ✅</h2>
@@ -168,7 +276,7 @@ export const approveItemDonation = async (donationId, adminId) => {
           <p style="margin: 0;"><strong>Donation Details:</strong></p>
           <ul style="margin: 10px 0;">
             <li>Category: ${donation.category}</li>
-            <li>Items: ${donation.items.join(', ')}</li>
+            <li>Items: ${donation.items.join(", ")}</li>
             <li>Status: Approved & Active</li>
           </ul>
         </div>
@@ -180,20 +288,20 @@ export const approveItemDonation = async (donationId, adminId) => {
           Charity Platform Team
         </p>
       </div>
-      `
+      `,
     );
 
     return {
       success: true,
-      message: 'Item donation approved',
+      message: "Item donation approved",
       donation,
       status: 200,
     };
   } catch (err) {
-    console.error('Approve item donation error:', err);
+    console.error("Approve item donation error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };
@@ -201,14 +309,21 @@ export const approveItemDonation = async (donationId, adminId) => {
 };
 
 // Admin reject item donation
-export const rejectItemDonation = async (donationId, adminId, rejectionReason) => {
+export const rejectItemDonation = async (
+  donationId,
+  adminId,
+  rejectionReason,
+) => {
   try {
-    const donation = await ItemDonation.findById(donationId).populate('donor', 'userName email');
-    
+    const donation = await ItemDonation.findById(donationId).populate(
+      "donor",
+      "userName email",
+    );
+
     if (!donation) {
       return {
         success: false,
-        message: 'Donation not found',
+        message: "Donation not found",
         status: 404,
       };
     }
@@ -216,17 +331,17 @@ export const rejectItemDonation = async (donationId, adminId, rejectionReason) =
     if (!rejectionReason) {
       return {
         success: false,
-        message: 'Rejection reason is required',
+        message: "Rejection reason is required",
         status: 400,
       };
     }
 
-    donation.adminStatus = 'rejected';
+    donation.adminStatus = "rejected";
     donation.isActive = false;
     donation.adminReviewedBy = adminId;
     donation.adminReviewedAt = Date.now();
     donation.rejectionReason = rejectionReason;
-    donation.deliveryStatus = 'pending'; // Reset delivery status for rejected items
+    donation.deliveryStatus = "pending"; // Reset delivery status for rejected items
     donation.acceptedBy = null; // Clear acceptedBy if it exists
     donation.acceptedAt = null; // Clear acceptedAt if it exists
 
@@ -235,7 +350,7 @@ export const rejectItemDonation = async (donationId, adminId, rejectionReason) =
     // Send rejection email to donor
     await sendorgEmail(
       donation.donor.email,
-      'Item Donation Status Update',
+      "Item Donation Status Update",
       `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #ef4444;">Donation Status Update</h2>
@@ -253,91 +368,110 @@ export const rejectItemDonation = async (donationId, adminId, rejectionReason) =
           <strong>Charity Platform Team</strong>
         </p>
       </div>
-      `
+      `,
     );
 
     return {
       success: true,
-      message: 'Item donation rejected',
+      message: "Item donation rejected",
       donation,
       status: 200,
     };
   } catch (err) {
-    console.error('Reject item donation error:', err);
+    console.error("Reject item donation error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };
   }
 };
 
-// Get available items for NGOs (approved and active) - filtered by NGO's state
-export const getAvailableItemsForNGOs = async (ngoId = null) => {
+// Get available items for NGOs (approved and active) - filtered by NGO's state and tier
+export const getAvailableItemsForNGOs = async (ngoId) => {
   try {
-    let query = {
+
+    // Get NGO details - POPULATE subscription if it's a reference
+    const ngo = await User.findById(ngoId)
+      .select('userName userType state subscription')
+      .lean(); // Use lean() for better performance
+
+    if (!ngo) {
+      return {
+        success: false,
+        message: 'NGO not found',
+        donations: [],
+        count: 0,
+        status: 404,
+      };
+    }
+
+    // ✅ FIX: Get tier with multiple fallback checks
+    const ngoTier = 
+      ngo.subscription?.currentTier || 
+      ngo.subscription?.tier || 
+      ngo.currentTier || 
+      1; // Default to tier 1
+
+    // Fetch donations
+    const donations = await ItemDonation.find({
       adminStatus: 'approved',
       isActive: true,
       acceptedBy: null,
-    };
+      requiredTier: { $lte: ngoTier },
+    })
+    .sort({ createdAt: -1 })
+    .populate('donor', 'userName phone address city state');
 
-    // If NGO ID is provided, filter by state
-    if (ngoId) {
-      const ngo = await User.findById(ngoId).select('state');
-      if (ngo && ngo.state) {
-        // Find donations where donor's state matches NGO's state
-        const donations = await ItemDonation.find(query)
-          .sort({ createdAt: -1 })
-          .populate({
-            path: 'donor',
-            select: 'userName phone address city state',
-            match: { state: ngo.state } // Filter by matching state
-          });
-
-        // Filter out null donors (where state didn't match)
-        const filteredDonations = donations.filter(d => d.donor !== null);
-
-        return {
-          success: true,
-          donations: filteredDonations,
-          count: filteredDonations.length,
-          status: 200,
-        };
-      }
-    }
-
-    // Fallback: if no NGO ID or no state, return all
-    const donations = await ItemDonation.find(query)
-      .sort({ createdAt: -1 })
-      .populate('donor', 'userName phone address city state');
+    // Filter by state
+    const filteredDonations = ngo.state 
+      ? donations.filter(d => {
+          const matches = d.donor && d.donor.state === ngo.state;
+          const tierMatch = d.requiredTier <= ngoTier;
+          
+          if (!tierMatch) {
+            console.log(`  ❌ Tier too low: ${d.category} requires Tier ${d.requiredTier}, NGO has Tier ${ngoTier}`);
+          } else if (matches) {
+            console.log(`  ✅ MATCHED: ${d.category} (State: ${d.donor.state}, Tier: ${d.requiredTier})`);
+          }
+          
+          return matches && tierMatch;
+        })
+      : donations.filter(d => d.requiredTier <= ngoTier);
 
     return {
       success: true,
-      donations,
-      count: donations.length,
+      donations: filteredDonations,
+      count: filteredDonations.length,
+      ngoTier,
       status: 200,
     };
   } catch (err) {
+    console.error('❌ Get available items error:', err);
     return {
       success: false,
       message: 'Server error',
       error: err.message,
+      donations: [],
+      count: 0,
       status: 500,
     };
   }
 };
+
 
 // NGO accept item donation
 export const acceptItemDonation = async (donationId, ngoId) => {
   try {
     const donation = await ItemDonation.findById(donationId)
-      .populate('donor', 'userName email phone address');
-    
+      .populate("donor", "userName email phone address")
+      .populate("categoryId", "name requiredTier");
+
     if (!donation) {
       return {
         success: false,
-        message: 'Donation not found',
+        message: "Donation not found",
         status: 404,
       };
     }
@@ -345,32 +479,98 @@ export const acceptItemDonation = async (donationId, ngoId) => {
     if (!donation.isActive || donation.acceptedBy) {
       return {
         success: false,
-        message: 'This donation is no longer available',
+        message: "This donation is no longer available",
         status: 400,
       };
     }
 
     const ngo = await User.findById(ngoId);
-    if (!ngo || ngo.userType !== 'ngo') {
+    if (!ngo || ngo.userType !== "ngo") {
       return {
         success: false,
-        message: 'Invalid NGO',
+        message: "Invalid NGO",
         status: 403,
       };
     }
 
+    // Check subscription status and tier access
+    const ngoTier = ngo.currentTier || 1;
+
+    // Check if subscription is active (if not on free tier)
+    if (ngoTier > 1) {
+      const subscription = await NGOSubscription.findById(ngo.subscriptionId);
+      if (!subscription || subscription.status !== "active") {
+        return {
+          success: false,
+          message:
+            "Your subscription is not active. Please renew to accept donations.",
+          status: 403,
+        };
+      }
+
+      // Check monthly acceptance limit
+      const canAccept = subscription.canAcceptItem();
+      if (!canAccept) {
+        return {
+          success: false,
+          message:
+            "You have reached your monthly item acceptance limit. Please upgrade your plan.",
+          status: 403,
+        };
+      }
+    }
+
+    // Check tier access for this category
+    if (donation.categoryId) {
+      const categoryTier = donation.categoryId.requiredTier || 1;
+      if (ngoTier < categoryTier) {
+        return {
+          success: false,
+          message: `This item requires ${donation.categoryId.name} category access. Please upgrade to Tier ${categoryTier} or higher.`,
+          status: 403,
+        };
+      }
+    }
+
+    // Check item value limit
+    if (donation.itemValue) {
+      const subscription = await NGOSubscription.findById(
+        ngo.subscriptionId,
+      ).populate("plan");
+      const maxItemValue = subscription?.plan?.limits?.maxItemValue || 50000; // Default for free tier
+
+      if (maxItemValue !== -1 && donation.itemValue > maxItemValue) {
+        return {
+          success: false,
+          message: `This item exceeds your maximum item value limit of ₹${maxItemValue.toLocaleString("en-IN")}. Please upgrade your plan.`,
+          status: 403,
+        };
+      }
+    }
+
+    // Accept the donation
     donation.acceptedBy = ngoId;
     donation.acceptedAt = Date.now();
     donation.isActive = false; // Make inactive so others can't accept
-    donation.deliveryStatus = 'not_picked_up';
+    donation.deliveryStatus = "not_picked_up";
 
     await donation.save();
-    await donation.populate('acceptedBy', 'userName email phone');
+    await donation.populate("acceptedBy", "userName email phone");
+
+    // Increment monthly acceptance counter
+    if (ngo.subscriptionId) {
+      const subscription = await NGOSubscription.findById(ngo.subscriptionId);
+      if (subscription) {
+        subscription.usage.monthlyAcceptedItems += 1;
+        subscription.usage.lastAcceptedAt = Date.now();
+        await subscription.save();
+      }
+    }
 
     // Send email to donor with NGO details
     await sendorgEmail(
       donation.donor.email,
-      'Your Donation Has Been Accepted! 🎉',
+      "Your Donation Has Been Accepted! 🎉",
       `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #10b981;">Great News! Your Donation Has Been Accepted! 🎉</h2>
@@ -382,7 +582,7 @@ export const acceptItemDonation = async (donationId, ngoId) => {
           <ul style="margin: 10px 0;">
             <li>NGO: ${ngo.userName}</li>
             <li>Email: ${ngo.email}</li>
-            <li>Phone: ${ngo.phone || 'Not provided'}</li>
+            <li>Phone: ${ngo.phone || "Not provided"}</li>
           </ul>
         </div>
 
@@ -391,7 +591,7 @@ export const acceptItemDonation = async (donationId, ngoId) => {
           <ul style="margin: 10px 0;">
             <li>Address: ${donation.pickupAddress}</li>
             <li>Phone: ${donation.pickupPhone}</li>
-            <li>Items: ${donation.items.join(', ')}</li>
+            <li>Items: ${donation.items.join(", ")}</li>
           </ul>
         </div>
 
@@ -402,13 +602,13 @@ export const acceptItemDonation = async (donationId, ngoId) => {
           Charity Platform Team
         </p>
       </div>
-      `
+      `,
     );
 
     // Send email to NGO with donor details
     await sendorgEmail(
       ngo.email,
-      'Donation Accepted - Pickup Details 📦',
+      "Donation Accepted - Pickup Details 📦",
       `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #3b82f6;">Donation Accepted Successfully! 📦</h2>
@@ -428,8 +628,8 @@ export const acceptItemDonation = async (donationId, ngoId) => {
           <p style="margin: 0;"><strong>Donation Items:</strong></p>
           <ul style="margin: 10px 0;">
             <li>Category: ${donation.category}</li>
-            <li>Items: ${donation.items.join(', ')}</li>
-            ${donation.description ? `<li>Description: ${donation.description}</li>` : ''}
+            <li>Items: ${donation.items.join(", ")}</li>
+            ${donation.description ? `<li>Description: ${donation.description}</li>` : ""}
           </ul>
         </div>
 
@@ -444,20 +644,20 @@ export const acceptItemDonation = async (donationId, ngoId) => {
           <strong>Charity Platform Team</strong>
         </p>
       </div>
-      `
+      `,
     );
 
     return {
       success: true,
-      message: 'Donation accepted successfully',
+      message: "Donation accepted successfully",
       donation,
       status: 200,
     };
   } catch (err) {
-    console.error('Accept item donation error:', err);
+    console.error("Accept item donation error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };
@@ -468,13 +668,13 @@ export const acceptItemDonation = async (donationId, ngoId) => {
 export const updateDeliveryStatus = async (donationId, ngoId, newStatus) => {
   try {
     const donation = await ItemDonation.findById(donationId)
-      .populate('donor', 'userName email')
-      .populate('acceptedBy', 'userName email');
-    
+      .populate("donor", "userName email")
+      .populate("acceptedBy", "userName email");
+
     if (!donation) {
       return {
         success: false,
-        message: 'Donation not found',
+        message: "Donation not found",
         status: 404,
       };
     }
@@ -482,29 +682,29 @@ export const updateDeliveryStatus = async (donationId, ngoId, newStatus) => {
     if (donation.acceptedBy._id.toString() !== ngoId.toString()) {
       return {
         success: false,
-        message: 'Unauthorized',
+        message: "Unauthorized",
         status: 403,
       };
     }
 
     const validTransitions = {
-      'not_picked_up': ['picked_up'],
-      'picked_up': ['received'],
+      not_picked_up: ["picked_up"],
+      picked_up: ["received"],
     };
 
     if (!validTransitions[donation.deliveryStatus]?.includes(newStatus)) {
       return {
         success: false,
-        message: 'Invalid status transition',
+        message: "Invalid status transition",
         status: 400,
       };
     }
 
     donation.deliveryStatus = newStatus;
-    
-    if (newStatus === 'picked_up') {
+
+    if (newStatus === "picked_up") {
       donation.pickupDate = Date.now();
-    } else if (newStatus === 'received') {
+    } else if (newStatus === "received") {
       donation.receivedDate = Date.now();
     }
 
@@ -512,13 +712,14 @@ export const updateDeliveryStatus = async (donationId, ngoId, newStatus) => {
 
     // Send status update email to donor
     const statusMessages = {
-      'picked_up': {
-        subject: 'Your Donation Has Been Picked Up 📦',
-        message: 'Your donated items have been picked up by the NGO.',
+      picked_up: {
+        subject: "Your Donation Has Been Picked Up 📦",
+        message: "Your donated items have been picked up by the NGO.",
       },
-      'received': {
-        subject: 'Your Donation Has Been Received 🎉',
-        message: 'Your donated items have been received by the NGO and will be put to good use!',
+      received: {
+        subject: "Your Donation Has Been Received 🎉",
+        message:
+          "Your donated items have been received by the NGO and will be put to good use!",
       },
     };
 
@@ -536,10 +737,10 @@ export const updateDeliveryStatus = async (donationId, ngoId, newStatus) => {
         <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
           <p style="margin: 0;"><strong>Donation Details:</strong></p>
           <ul style="margin: 10px 0;">
-            <li>Items: ${donation.items.join(', ')}</li>
+            <li>Items: ${donation.items.join(", ")}</li>
             <li>NGO: ${donation.acceptedBy.userName}</li>
-            <li>Status: ${newStatus.replace('_', ' ').toUpperCase()}</li>
-            ${newStatus === 'received' ? `<li>Received: ${new Date().toLocaleString()}</li>` : ''}
+            <li>Status: ${newStatus.replace("_", " ").toUpperCase()}</li>
+            ${newStatus === "received" ? `<li>Received: ${new Date().toLocaleString()}</li>` : ""}
           </ul>
         </div>
 
@@ -550,20 +751,20 @@ export const updateDeliveryStatus = async (donationId, ngoId, newStatus) => {
           Charity Platform Team
         </p>
       </div>
-      `
+      `,
     );
 
     return {
       success: true,
-      message: 'Delivery status updated',
+      message: "Delivery status updated",
       donation,
       status: 200,
     };
   } catch (err) {
-    console.error('Update delivery status error:', err);
+    console.error("Update delivery status error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };
@@ -575,7 +776,7 @@ export const getNGOAcceptedDonations = async (ngoId) => {
   try {
     const donations = await ItemDonation.find({ acceptedBy: ngoId })
       .sort({ acceptedAt: -1 })
-      .populate('donor', 'userName email phone address city state');
+      .populate("donor", "userName email phone address city state");
 
     return {
       success: true,
@@ -584,10 +785,10 @@ export const getNGOAcceptedDonations = async (ngoId) => {
       status: 200,
     };
   } catch (err) {
-    console.error('Get NGO accepted donations error:', err);
+    console.error("Get NGO accepted donations error:", err);
     return {
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: err.message,
       status: 500,
     };

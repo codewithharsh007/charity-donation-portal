@@ -31,7 +31,7 @@ function loadLocalEnv() {
           console.warn('Failed to parse env file', p, res.error.message || res.error);
         } else {
           // eslint-disable-next-line no-console
-          console.log(`Loaded environment from ${p}`);
+        
         }
         return;
       }
@@ -61,7 +61,7 @@ const sendorgEmail = async (to, subject, otp) => {
       // so flows that depend on OTP can work without a real SMTP provider.
       // NOTE: In production, ensure EMAIL_USER and EMAIL_PASS are set.
 
-      console.log(`(DEV) OTP for ${to}: ${otp}`);
+    
       return { sent: true, devOtp: otp };
     }
 

@@ -1,3 +1,4 @@
+// components/Navbar.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,45 +10,116 @@ export default function Navbar() {
   const pathname = usePathname();
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [subscriptionTier, setSubscriptionTier] = useState(null);
 
   useEffect(() => {
-    // Check if user is logged in
-    const checkUser = () => {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
-      } else {
-        setUser(null);
-      }
-    };
-
-    // Check on mount
     checkUser();
-
-    // Listen for storage changes (for multi-tab sync)
     window.addEventListener('storage', checkUser);
-    
-    // Listen for custom login event
     window.addEventListener('userLoggedIn', checkUser);
 
     return () => {
       window.removeEventListener('storage', checkUser);
       window.removeEventListener('userLoggedIn', checkUser);
     };
-  }, [pathname]); // Re-check when route changes
+  }, [pathname]);
 
-  // Close menu when route changes
   useEffect(() => {
     setIsMenuOpen(false);
   }, [pathname]);
 
-  // Hide navbar on admin pages, donor dashboard, ngo dashboard, ngo marketplace, donate page, and thank-you page
+  const checkUser = () => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      
+      if (parsedUser.userType === 'ngo' || parsedUser.role === 'ngo') {
+        fetchSubscriptionTier();
+      }
+    } else {
+      setUser(null);
+      setSubscriptionTier(null);
+    }
+  };
+
+  const fetchSubscriptionTier = async () => {
+    try {
+      const response = await fetch('/api/subscriptions/current', {
+        credentials: 'include',
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setSubscriptionTier({
+          tier: data.data.currentTier || 1,
+          name: data.data.tierName || 'FREE',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    }
+  };
+
+  const getTierStyles = () => {
+    if (!subscriptionTier) return { ring: '', badge: '', icon: '' };
+
+    const styles = {
+      1: { 
+        ring: 'ring-2 ring-gray-400', 
+        badge: 'bg-gradient-to-br from-gray-500 to-gray-600 text-white',
+        icon: '🆓'
+      },
+      2: { 
+        ring: 'ring-2 ring-amber-600', 
+        badge: 'bg-gradient-to-br from-amber-600 to-amber-700 text-white',
+        icon: '🥉'
+      },
+      3: { 
+        ring: 'ring-2 ring-gray-300', 
+        badge: 'bg-gradient-to-br from-gray-300 to-gray-400 text-gray-800',
+        icon: '🥈'
+      },
+      4: { 
+        ring: 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-gray-800', 
+        badge: 'bg-gradient-to-br from-yellow-400 to-yellow-500 text-gray-900',
+        icon: '👑'
+      },
+    };
+
+    return styles[subscriptionTier.tier] || styles[1];
+  };
+
+  const renderAvatar = (size = 'md') => {
+    const tierStyles = getTierStyles();
+    const sizeClasses = {
+      sm: 'w-8 h-8',
+      md: 'w-9 h-9',
+    };
+
+    return (
+      <div className="relative">
+        {/* Avatar with Ring */}
+        <div className={`${sizeClasses[size]} ${tierStyles.ring} rounded-full p-0.5 bg-gray-800`}>
+          <div className={`w-full h-full bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg ${size === 'md' ? 'text-base' : 'text-sm'}`}>
+            {user?.userName?.charAt(0).toUpperCase()}
+          </div>
+        </div>
+
+        {/* Tier Badge - Bottom Right */}
+        {(user?.userType === 'ngo' || user?.role === 'ngo') && subscriptionTier && (
+          <div className={`absolute -bottom-1 -right-1 ${tierStyles.badge} rounded-full w-5 h-5 flex items-center justify-center shadow-lg border-2 border-gray-800`}>
+            <span className="text-xs">{tierStyles.icon}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/donorDashboard') || pathname?.startsWith('/ngoDashboard') || pathname?.startsWith('/ngo/marketplace') || pathname?.startsWith('/donate') || pathname?.startsWith('/thank-you')) {
     return null;
   }
 
-  // Don't show navbar for admin users
-  // (removed stray redirect logic) Navbar should not auto-redirect — login handler controls navigation
   const dashboardPath = user ? (user.role || user.userType) === 'ngo' ? '/ngoDashboard' : (user.role || user.userType) === 'admin' ? '/admin' : '/donorDashboard' : '/login';
   
   return (
@@ -74,19 +146,9 @@ export default function Navbar() {
               viewBox="0 0 24 24"
             >
               {isMenuOpen ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               )}
             </svg>
           </button>
@@ -103,18 +165,22 @@ export default function Navbar() {
               Contact
             </Link>
             
-            {/* Conditional Rendering: Login/Profile */}
             {user ? (
               <Link 
                 href={dashboardPath}
-                className="flex items-center gap-2 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 hover:border-red-500 transition-all cursor-pointer"
+                className="flex items-center gap-3 bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 hover:border-red-500 transition-all cursor-pointer group"
               >
-                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white font-bold">
-                  {user.userName?.charAt(0).toUpperCase()}
-                </div>
+                {/* Avatar with Ring and Badge */}
+                {renderAvatar('md')}
+                
+                {/* User Info */}
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <span className="text-white text-sm font-semibold">{user.userName}</span>
+                    <span className="text-white text-sm font-semibold group-hover:text-red-400 transition-colors">
+                      {user.userName}
+                    </span>
+                    
+                    {/* Verified Badge */}
                     {user.userType === 'ngo' && user.isVerified && (
                       <span className="text-green-500 text-xs font-bold flex items-center gap-1">
                         <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
@@ -140,24 +206,15 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-800 pt-4 text-center">
+          <div className="md:hidden mt-4 pb-4 border-t border-gray-800 pt-4">
             <div className="flex flex-col space-y-4">
-              <Link 
-                href="/" 
-                className="text-white hover:text-red-500 transition-colors py-2"
-              >
+              <Link href="/" className="text-white hover:text-red-500 transition-colors py-2 text-center">
                 Home
               </Link>
-              <Link 
-                href="/about" 
-                className="text-white hover:text-red-500 transition-colors py-2"
-              >
+              <Link href="/about" className="text-white hover:text-red-500 transition-colors py-2 text-center">
                 About
               </Link>
-              <Link 
-                href="/contact" 
-                className="text-white hover:text-red-500 transition-colors py-2"
-              >
+              <Link href="/contact" className="text-white hover:text-red-500 transition-colors py-2 text-center">
                 Contact
               </Link>
               
@@ -166,12 +223,15 @@ export default function Navbar() {
                   href={dashboardPath}
                   className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700 hover:border-red-500 transition-all"
                 >
-                  <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white font-bold">
-                    {user.userName?.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
+                  {/* Avatar with Ring and Badge */}
+                  {renderAvatar('sm')}
+                  
+                  {/* User Info */}
+                  <div className="flex flex-col flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-white text-sm font-semibold">{user.userName}</span>
+                      
+                      {/* Verified Badge */}
                       {user.userType === 'ngo' && user.isVerified && (
                         <span className="text-green-500 text-xs font-bold flex items-center gap-1">
                           <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">

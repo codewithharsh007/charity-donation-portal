@@ -123,6 +123,26 @@ export default function AdminLayout({ children }) {
                   Users
                 </Link>
                 <Link
+                  href="/admin/subscriptions"
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                    pathname === '/admin/subscriptions'
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  Subscriptions
+                </Link>
+                <Link
+                  href="/admin/financials"
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                    pathname === '/admin/financials'
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  Financials
+                </Link>
+                <Link
                   href="/admin/analytics"
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
                     pathname === '/admin/analytics'
@@ -251,6 +271,26 @@ export default function AdminLayout({ children }) {
                   }`}
                 >
                   Users
+                </Link>
+                <Link
+                  href="/admin/subscriptions"
+                  className={`rounded-lg px-4 py-3 text-sm font-medium transition-all ${
+                    pathname === '/admin/subscriptions'
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                  }`}
+                >
+                  Subscriptions
+                </Link>
+                <Link
+                  href="/admin/financials"
+                  className={`rounded-lg px-4 py-3 text-sm font-medium transition-all ${
+                    pathname === '/admin/financials'
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                  }`}
+                >
+                  Financials
                 </Link>
                 <Link
                   href="/admin/analytics"

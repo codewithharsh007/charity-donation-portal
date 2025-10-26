@@ -12,7 +12,8 @@ export async function POST(request, { params }) {
       return NextResponse.json({ message: auth.message }, { status: auth.status });
     }
 
-    const { id } = params;
+    // ✅ FIX: Await params in Next.js 15
+    const { id } = await params;
 
     const result = await acceptItemDonation(id, auth.userId);
 

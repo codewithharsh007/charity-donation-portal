@@ -19,7 +19,6 @@ export async function POST(request) {
     }
 
     const donationData = await request.json();
-
     const result = await createItemDonation(auth.userId, donationData);
 
     return NextResponse.json(
@@ -31,6 +30,7 @@ export async function POST(request) {
       { status: result.status }
     );
   } catch (error) {
+    console.error('❌ POST /api/donations/items error:', error);
     return NextResponse.json(
       { success: false, message: 'Server error', error: error.message },
       { status: 500 }
@@ -49,23 +49,21 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type'); // 'donor', 'ngo'
-    const filter = searchParams.get('filter'); // 'available', 'accepted'
+    const type = searchParams.get('type');
+    const filter = searchParams.get('filter');
+
 
     let result;
     
     if (type === 'ngo') {
       if (filter === 'available') {
-        // NGO viewing available items - filtered by their state
         result = await getAvailableItemsForNGOs(auth.userId);
       } else if (filter === 'accepted') {
-        // NGO viewing their accepted items
         result = await getNGOAcceptedDonations(auth.userId);
       } else {
         result = await getAvailableItemsForNGOs(auth.userId);
       }
     } else {
-      // Donor viewing their donations
       result = await getDonorItemDonations(auth.userId);
     }
 
@@ -78,6 +76,7 @@ export async function GET(request) {
       { status: result.status }
     );
   } catch (error) {
+    console.error('❌ GET /api/donations/items error:', error);
     return NextResponse.json(
       { success: false, message: 'Server error', error: error.message },
       { status: 500 }

@@ -1,6 +1,8 @@
+// middlewares/authMiddleware.js
 import { cookies } from 'next/headers';
-import User from '../models/authModel';
-import { verifyToken } from '../config/JWT';
+import User from '@/models/authModel'; // Use absolute path
+import { verifyToken } from '@/config/JWT';
+import dbConnect from '@/lib/mongodb'; // Add this
 
 /**
  * protect - authentication middleware for Next.js API routes
@@ -10,6 +12,7 @@ import { verifyToken } from '../config/JWT';
  */
 export const protect = async (request) => {
   try {
+    
     // Get token from cookies or Authorization header
     const cookieStore = await cookies();
     const tokenFromCookie = cookieStore.get('token')?.value;
@@ -24,7 +27,7 @@ export const protect = async (request) => {
     if (!token) {
       return { 
         success: false, 
-        message: 'Not authorized', 
+        message: 'Not authorized - No token provided', 
         status: 401 
       };
     }
@@ -34,8 +37,7 @@ export const protect = async (request) => {
     try {
       decoded = verifyToken(token);
     } catch (verifyErr) {
-      // Token malformed or expired - return 401 instead of 500
-      console.warn('Token verification failed:', verifyErr.message || verifyErr);
+      console.warn('🔐 Token verification failed:', verifyErr.message || verifyErr);
       return {
         success: false,
         message: 'Token invalid or expired',
@@ -43,11 +45,15 @@ export const protect = async (request) => {
       };
     }
 
+    // Connect to database before querying
+    await dbConnect();
+
     // Find user
     const user = await User.findById(decoded.id).select('-password');
+    
     if (!user) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: 'User not found', 
         status: 401 
       };
@@ -55,11 +61,15 @@ export const protect = async (request) => {
 
     return {
       success: true,
-      user: user,
+      user: {
+        ...user.toObject(),
+        userId: user._id, // Add userId here for convenience
+      },
       userId: user._id,
       status: 200
     };
   } catch (err) {
+    console.error('🔐 Auth error:', err);
     return { 
       success: false, 
       message: 'Authentication error', 
