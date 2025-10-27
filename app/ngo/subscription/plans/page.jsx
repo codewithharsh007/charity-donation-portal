@@ -70,7 +70,7 @@ export default function SubscriptionPlansPage() {
       handleDowngradeToFree();
     } else {
       // Go to checkout for paid tiers (both upgrade and downgrade)
-      router.push(`/subscription/checkout?planId=${selectedPlan._id}&tier=${selectedPlan.tier}`);
+      router.push(`/ngo/subscription/checkout?planId=${selectedPlan._id}&tier=${selectedPlan.tier}`);
     }
   };
 
@@ -294,13 +294,13 @@ export default function SubscriptionPlansPage() {
           </h2>
           <div className="space-y-4">
             <details className="bg-white rounded-lg p-4 shadow">
-              <summary className="font-semibold cursor-pointer">Can I try before I buy?</summary>
+              <summary className="font-semibold cursor-pointer text-gray-700">Can I try before I buy?</summary>
               <p className="mt-2 text-gray-600">
                 Yes! BRONZE tier offers a 14-day free trial, and SILVER/GOLD tiers offer 7-day free trials.
               </p>
             </details>
             <details className="bg-white rounded-lg p-4 shadow">
-              <summary className="font-semibold cursor-pointer">Can I change my plan later?</summary>
+              <summary className="font-semibold cursor-pointer text-gray-700">Can I change my plan later?</summary>
               <p className="mt-2 text-gray-600">
                 Absolutely! You can upgrade instantly or downgrade at any time.
               </p>

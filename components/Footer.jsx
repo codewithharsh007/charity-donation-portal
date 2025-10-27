@@ -43,7 +43,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About Section */}
           <div>
-            <h3 className="text-red-600 text-xl font-bold mb-4">Charity</h3>
+            <h3 className="text-red-600 text-xl font-bold mb-4">DaanSetu</h3>
             <p className="text-sm">
               Making a difference in lives through compassionate giving and support for those in need.
             </p>
@@ -107,8 +107,8 @@ export default function Footer() {
           <div>
             <h4 className="text-white font-semibold mb-4">Get In Touch</h4>
             <ul className="space-y-2 text-sm">
-              <li>Email: info@charity.org</li>
-              <li>Phone: +1 (555) 123-4567</li>
+              <li>Email: info@daansetu.org</li>
+              <li>Phone: +91 99903 72005</li>
               <li>Address: 123 Charity Street, City, State 12345</li>
             </ul>
           </div>
@@ -116,7 +116,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-8 pt-6 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} Charity Platform. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} DaanSetu. All rights reserved.</p>
         </div>
       </div>
     </footer>

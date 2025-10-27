@@ -1,17 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { escape } from 'querystring';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -23,59 +22,69 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
       });
 
       const data = await response.json();
 
-      if (response.ok) {
-        // Store user data in localStorage
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
+      if (response.ok && data.success) {
+        // ✅ Store COMPLETE user data including token
+        const userData = {
+          token: data.token,
+          userId: data.user._id || data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role || data.user.userType,
+          ...data.user,
+        };
+
+        localStorage.setItem("user", JSON.stringify(userData));
+
         // Trigger custom event to update Navbar
-        window.dispatchEvent(new Event('userLoggedIn'));
-        
-        // Redirect based on user role or userType
+        window.dispatchEvent(new Event("userLoggedIn"));
+
+        // Redirect based on user role
         const role = data.user.role || data.user.userType;
-        if (role === 'admin') {
-          router.push('/admin');
-        } else if (role === 'donor') {
-          router.push('/donorDashboard');
-        } else if (role === 'ngo') {
-          router.push('/ngoDashboard');
+        if (role === "admin") {
+          router.push("/admin");
+        } else if (role === "donor") {
+          router.push("/dashboard");
+        } else if (role === "ngo") {
+          router.push("/ngo/dashboard");
         }
         router.refresh();
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.message || "Login failed");
       }
     } catch (err) {
-      setError('Server error. Please try again.');
+      console.error("Login error:", err);
+      setError("Server error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-gray-800 rounded-2xl shadow-2xl p-8">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black px-4">
+      <div className="w-full max-w-md rounded-2xl bg-gray-800 p-8 shadow-2xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
+        <div className="mb-8 text-center">
+          <h1 className="mb-2 text-3xl font-bold text-white">Welcome Back</h1>
           <p className="text-gray-400">Login to your account</p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500 text-sm">
+          <div className="mb-4 rounded-lg border border-red-500 bg-red-500/10 p-4 text-sm text-red-500">
             {error}
           </div>
         )}
@@ -84,7 +93,10 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-gray-300"
+            >
               Email Address
             </label>
             <input
@@ -94,14 +106,17 @@ export default function LoginPage() {
               value={formData.email}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+              className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 text-white transition-all focus:border-transparent focus:ring-2 focus:ring-red-500 focus:outline-none"
               placeholder="Enter your email"
             />
           </div>
 
           {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-gray-300"
+            >
               Password
             </label>
             <input
@@ -111,7 +126,7 @@ export default function LoginPage() {
               value={formData.password}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+              className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 text-white transition-all focus:border-transparent focus:ring-2 focus:ring-red-500 focus:outline-none"
               placeholder="Enter your password"
             />
           </div>
@@ -120,17 +135,20 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-red-600 py-3 font-semibold text-white transition-all hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
         {/* Register Link */}
         <div className="mt-6 text-center">
           <p className="text-gray-400">
-            Don't have an account?{' '}
-            <Link href="/register" className="text-red-500 hover:text-red-400 font-semibold">
+            Don't have an account?{" "}
+            <Link
+              href="/register"
+              className="font-semibold text-red-500 hover:text-red-400"
+            >
               Register here
             </Link>
           </p>

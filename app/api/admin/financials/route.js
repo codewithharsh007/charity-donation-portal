@@ -1,10 +1,10 @@
-// app/api/admin/financials/route.js
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/config/JWT';
 import dbConnect from '@/lib/mongodb';
 import SubscriptionTransaction from '@/models/subscriptionTransactionModel';
-import FinancialDonation from '@/models/financialDonationModel'; // ✅ ADD THIS IMPORT
+import FinancialDonation from '@/models/financialDonationModel';
+import FinancialRequest from '@/models/financialRequest'; // ✅ ADD THIS
 import User from '@/models/authModel';
 
 export const runtime = 'nodejs';
@@ -54,14 +54,23 @@ export async function GET(req) {
       grandTotal += tx.invoice?.total || tx.amount || 0;
     });
 
-    // ===== FINANCIAL DONATIONS ===== ✅ CORRECTED
+    // ===== FINANCIAL DONATIONS =====
     const completedDonations = await FinancialDonation.find({ 
-      status: 'completed' // ✅ Using 'status' field
+      status: 'completed'
     }).lean();
 
     const donationTotal = completedDonations.reduce((sum, d) => sum + (d.amount || 0), 0);
 
-    // This month's donations
+    // ===== APPROVED FUNDING REQUESTS (EXPENSES) ===== ✅ NEW
+    const approvedFundingRequests = await FinancialRequest.find({
+      adminStatus: 'approved'
+    }).lean();
+
+    const fundingRequestsTotal = approvedFundingRequests.reduce(
+      (sum, fr) => sum + (fr.approvedAmount || 0), 0
+    );
+
+    // This month's calculations
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -69,18 +78,23 @@ export async function GET(req) {
     const monthlyDonations = completedDonations.filter(d => 
       new Date(d.createdAt) >= startOfMonth
     );
-
     const monthlyDonationTotal = monthlyDonations.reduce((sum, d) => 
       sum + (d.amount || 0), 0
     );
 
-    // This month's subscription revenue
     const monthlyTransactions = completedTransactions.filter(tx => 
       new Date(tx.createdAt) >= startOfMonth
     );
-
     const monthlySubTotal = monthlyTransactions.reduce((sum, tx) => 
       sum + (tx.invoice?.total || tx.amount || 0), 0
+    );
+
+    // ✅ Monthly funding requests
+    const monthlyFundingRequests = approvedFundingRequests.filter(fr =>
+      new Date(fr.adminReviewedAt) >= startOfMonth
+    );
+    const monthlyFundingTotal = monthlyFundingRequests.reduce(
+      (sum, fr) => sum + (fr.approvedAmount || 0), 0
     );
 
     // Revenue by tier
@@ -103,7 +117,7 @@ export async function GET(req) {
 
     const revenueByTierArray = Object.values(revenueByTier).sort((a, b) => a._id - b._id);
 
-    // Monthly revenue trend (last 6 months) - INCLUDING DONATIONS
+    // Monthly trend (last 6 months)
     const monthlyTrend = {};
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -120,9 +134,11 @@ export async function GET(req) {
             _id: { year: date.getFullYear(), month: date.getMonth() + 1 },
             subscriptionRevenue: 0,
             donationRevenue: 0,
+            fundingExpenses: 0,
             totalRevenue: 0,
             subscriptionCount: 0,
             donationCount: 0,
+            fundingCount: 0,
           };
         }
         
@@ -144,15 +160,41 @@ export async function GET(req) {
             _id: { year: date.getFullYear(), month: date.getMonth() + 1 },
             subscriptionRevenue: 0,
             donationRevenue: 0,
+            fundingExpenses: 0,
             totalRevenue: 0,
             subscriptionCount: 0,
             donationCount: 0,
+            fundingCount: 0,
           };
         }
         
         monthlyTrend[key].donationRevenue += d.amount || 0;
         monthlyTrend[key].totalRevenue += d.amount || 0;
         monthlyTrend[key].donationCount += 1;
+      });
+
+    // ✅ Add funding expenses
+    approvedFundingRequests
+      .filter(fr => new Date(fr.adminReviewedAt) >= sixMonthsAgo)
+      .forEach(fr => {
+        const date = new Date(fr.adminReviewedAt);
+        const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+        
+        if (!monthlyTrend[key]) {
+          monthlyTrend[key] = {
+            _id: { year: date.getFullYear(), month: date.getMonth() + 1 },
+            subscriptionRevenue: 0,
+            donationRevenue: 0,
+            fundingExpenses: 0,
+            totalRevenue: 0,
+            subscriptionCount: 0,
+            donationCount: 0,
+            fundingCount: 0,
+          };
+        }
+        
+        monthlyTrend[key].fundingExpenses += fr.approvedAmount || 0;
+        monthlyTrend[key].fundingCount += 1;
       });
 
     const monthlyTrendArray = Object.values(monthlyTrend).sort((a, b) => {
@@ -169,7 +211,7 @@ export async function GET(req) {
       sum + (tx.refundAmount || 0), 0
     );
 
-    // Total revenue (subscriptions + donations)
+    // Total revenue & net calculations
     const totalRevenue = grandTotal + donationTotal;
     const netRevenue = totalRevenue - refundTotal;
 
@@ -189,6 +231,12 @@ export async function GET(req) {
           thisMonth: monthlyDonationTotal,
           count: completedDonations.length,
           monthlyCount: monthlyDonations.length,
+        },
+        fundingRequests: { // ✅ NEW
+          allTime: fundingRequestsTotal,
+          thisMonth: monthlyFundingTotal,
+          count: approvedFundingRequests.length,
+          monthlyCount: monthlyFundingRequests.length,
         },
         refunds: {
           total: refundTotal,

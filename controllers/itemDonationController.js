@@ -429,13 +429,7 @@ export const getAvailableItemsForNGOs = async (ngoId) => {
       ? donations.filter(d => {
           const matches = d.donor && d.donor.state === ngo.state;
           const tierMatch = d.requiredTier <= ngoTier;
-          
-          if (!tierMatch) {
-            console.log(`  ❌ Tier too low: ${d.category} requires Tier ${d.requiredTier}, NGO has Tier ${ngoTier}`);
-          } else if (matches) {
-            console.log(`  ✅ MATCHED: ${d.category} (State: ${d.donor.state}, Tier: ${d.requiredTier})`);
-          }
-          
+                  
           return matches && tierMatch;
         })
       : donations.filter(d => d.requiredTier <= ngoTier);

@@ -28,9 +28,9 @@ export default function ThankYouPage() {
 
   const handleGoToDashboard = () => {
     if (user?.role === 'ngo') {
-      router.push('/ngoDashboard');
+      router.push('/ngo/dashboard');
     } else {
-      router.push('/donorDashboard');
+      router.push('/dashboard');
     }
   };
 

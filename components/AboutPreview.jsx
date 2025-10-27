@@ -7,7 +7,7 @@ export default function AboutPreview() {
       <div className="container mx-auto px-4 md:px-6">
         
         {/* Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 text-center">
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 text-center">
           <div className="p-6 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow">
             <h3 className="text-4xl md:text-5xl font-bold text-teal-500 mb-2">5,000+</h3>
             <p className="text-lg text-gray-600">Children Supported</p>
@@ -20,7 +20,7 @@ export default function AboutPreview() {
             <h3 className="text-4xl md:text-5xl font-bold text-pink-500 mb-2">100+</h3>
             <p className="text-lg text-gray-600">NGO Partners</p>
           </div>
-        </div>
+        </div> */}
 
         {/* Mission & Vision Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">

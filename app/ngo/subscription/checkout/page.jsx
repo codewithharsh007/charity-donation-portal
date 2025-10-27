@@ -90,7 +90,7 @@ export default function CheckoutPage() {
           showToast('Trial activated successfully!', 'success');
           // ✅ Wait a bit for database to update, then redirect
           setTimeout(() => {
-            router.push('/ngoDashboard');
+            router.push('/ngo/dashboard');
             router.refresh(); // Force refresh the page
           }, 1500);
         } else {
@@ -202,7 +202,7 @@ export default function CheckoutPage() {
           // ✅ CRITICAL FIX: Wait for database to fully update, then redirect
           setTimeout(() => {
             // Force hard navigation to ensure fresh data
-            window.location.href = '/ngoDashboard';
+            window.location.href = '/ngo/dashboard';
           }, 2000);
         } else {
           showToast(verifyData.message || 'Payment verification failed', 'error');
@@ -252,7 +252,7 @@ export default function CheckoutPage() {
               
               // ✅ Wait for database update, then redirect
               setTimeout(() => {
-                window.location.href = '/ngoDashboard';
+                window.location.href = '/ngo/dashboard';
               }, 2000);
             } else {
               showToast(verifyData.message || 'Payment verification failed', 'error');
@@ -424,12 +424,12 @@ export default function CheckoutPage() {
                   ) : (
                     <div className="space-y-3 mb-6">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Subtotal:</span>
-                        <span className="font-semibold">₹{subtotal.toFixed(2)}</span>
+                        <span className="text-gray-900">Subtotal:</span>
+                        <span className="font-semibold text-gray-900">₹{subtotal.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">GST (18%):</span>
-                        <span className="font-semibold">₹{gst.toFixed(2)}</span>
+                        <span className="text-gray-900">GST (18%):</span>
+                        <span className="font-semibold text-gray-900">₹{gst.toFixed(2)}</span>
                       </div>
                       <div className="border-t pt-3">
                         <div className="flex justify-between">
@@ -523,7 +523,7 @@ export default function CheckoutPage() {
                   setShowTestModal(false);
                   setProcessing(false);
                 }}
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 rounded text-gray-800 bg-gray-300 hover:bg-gray-400 transition-colors"
               >
                 Cancel
               </button>

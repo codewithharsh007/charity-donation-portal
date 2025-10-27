@@ -24,7 +24,6 @@ if (!isTestMode) {
     console.warn('⚠️ Razorpay credentials missing. Set SUBSCRIPTION_TEST_MODE=true for testing.');
   }
 } else {
-  console.log('🧪 Running in SUBSCRIPTION TEST MODE');
 }
 
 // Create Payment Order (for subscription payment)

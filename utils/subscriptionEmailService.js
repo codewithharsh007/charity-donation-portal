@@ -99,7 +99,7 @@ export const sendCancellationEmail = async (to, data) => {
           </p>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ngoDashboard/subscription" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ngo/dashboard/subscription" 
                style="display: inline-block; background: linear-gradient(90deg, #ef4444, #dc2626); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
               View Subscription Status
             </a>
@@ -196,7 +196,7 @@ export const sendTierChangeEmail = async (to, data) => {
           </p>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ngoDashboard/subscription" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ngo/dashboard/subscription" 
                style="display: inline-block; background: linear-gradient(90deg, ${color}, ${color}dd); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
               View Subscription Details
             </a>
@@ -287,7 +287,7 @@ export const sendRefundEmail = async (to, data) => {
           </p>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ngoDashboard/subscription" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ngo/dashboard/subscription" 
                style="display: inline-block; background: linear-gradient(90deg, #10b981, #059669); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
               View Transaction History
             </a>
@@ -377,7 +377,7 @@ export const sendExpiryReminderEmail = async (to, data) => {
           </p>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/ngoDashboard/subscription" 
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/subscription" 
                style="display: inline-block; background: linear-gradient(90deg, #f59e0b, #d97706); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
               Renew Subscription
             </a>

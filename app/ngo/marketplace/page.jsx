@@ -44,7 +44,7 @@ export default function NGOMarketplacePage() {
     // Check if NGO is verified
     if (!user.isVerified) {
       showToast('Access denied. Only verified NGOs can access the marketplace.', 'error');
-      router.push('/ngoDashboard');
+      router.push('/ngo/dashboard');
       return;
     }
     
@@ -180,7 +180,7 @@ export default function NGOMarketplacePage() {
                 Home
               </button>
               <button
-                onClick={() => router.push('/ngoDashboard')}
+                onClick={() => router.push('/ngo/dashboard')}
                 className="px-4 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-700 transition-colors"
               >
                 Dashboard

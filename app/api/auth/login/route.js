@@ -16,16 +16,21 @@ export async function POST(request) {
       cookieStore.set('token', result.token, cookieOptions);
     }
 
+    // ✅ RETURN TOKEN IN RESPONSE
     return NextResponse.json(
       {
+        success: result.success, // ✅ Added
         message: result.message,
         user: result.user,
+        token: result.token, // ✅ Added - Return token to frontend
+        userId: result.user?._id || result.user?.id, // ✅ Added
+        role: result.user?.role // ✅ Added
       },
       { status: result.status }
     );
   } catch (error) {
     return NextResponse.json(
-      { message: 'Server error', error: error.message },
+      { success: false, message: 'Server error', error: error.message },
       { status: 500 }
     );
   }

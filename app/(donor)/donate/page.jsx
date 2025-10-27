@@ -501,7 +501,7 @@ export default function DonatePage() {
                 <button
                   onClick={() => {
                     const dashboardPath =
-                      user.role === "ngo" ? "/ngoDashboard" : "/donorDashboard";
+                      user.role === "ngo" ? "/ngo/dashboard" : "/dashboard";
                     router.push(dashboardPath);
                   }}
                   className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-700"
@@ -657,7 +657,7 @@ export default function DonatePage() {
                               onClick={() =>
                                 setFinancialAmount(amount.toString())
                               }
-                              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:border-green-500 hover:text-green-600"
+                              className="rounded-lg border text-green-600 border-green-600 bg-white px-3 py-2 text-sm hover:border-green-700 hover:text-green-700"
                             >
                               ₹{amount}
                             </button>

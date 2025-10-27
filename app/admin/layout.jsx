@@ -91,7 +91,7 @@ export default function AdminLayout({ children }) {
               </Link>
 
               {/* Desktop Navigation Links */}
-              <div className=" pl-2 hidden md:flex items-center gap-1">
+              <div className="pl-2 hidden md:flex items-center gap-1">
                 <Link
                   href="/admin/dashboard"
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
@@ -131,6 +131,17 @@ export default function AdminLayout({ children }) {
                   }`}
                 >
                   Subscriptions
+                </Link>
+                {/* ✅ NEW: Funding Requests */}
+                <Link
+                  href="/admin/funding-requests"
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                    pathname === '/admin/funding-requests'
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  Fund Req
                 </Link>
                 <Link
                   href="/admin/financials"
@@ -281,6 +292,17 @@ export default function AdminLayout({ children }) {
                   }`}
                 >
                   Subscriptions
+                </Link>
+                {/* ✅ NEW: Funding Requests Mobile */}
+                <Link
+                  href="/admin/funding-requests"
+                  className={`rounded-lg px-4 py-3 text-sm font-medium transition-all ${
+                    pathname === '/admin/funding-requests'
+                      ? 'bg-red-600 text-white'
+                      : 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                  }`}
+                >
+                  Fund Req
                 </Link>
                 <Link
                   href="/admin/financials"

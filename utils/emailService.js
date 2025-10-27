@@ -1,49 +1,4 @@
-// ...existing code...
-import fs from 'fs';
-import path from 'path';
 import nodemailer from 'nodemailer';
-
-function loadLocalEnv() {
-  try {
-    // Use an indirect/anonymous require to avoid static analysis by bundlers
-    // so they don't try to resolve 'dotenv' when it's not installed.
-    let dotenv = null;
-    try {
-      /* eslint-disable no-eval */
-      const req = eval('require');
-      dotenv = req && req('dotenv');
-      /* eslint-enable no-eval */
-    } catch (e) {
-      // dotenv not installed — skip loading local env files
-      // Users can still set env vars in their environment or install dotenv.
-      // eslint-disable-next-line no-console
-      console.warn('dotenv not available; skipping local .env load');
-      return;
-    }
-
-    const candidates = ['.env.local', 'local.env', '.env'];
-    for (const fname of candidates) {
-      const p = path.resolve(process.cwd(), fname);
-      if (fs.existsSync(p)) {
-        const res = dotenv.config({ path: p });
-        if (res.error) {
-          // eslint-disable-next-line no-console
-          console.warn('Failed to parse env file', p, res.error.message || res.error);
-        } else {
-          // eslint-disable-next-line no-console
-        
-        }
-        return;
-      }
-    }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('Failed to load local env file:', err && err.message ? err.message : err);
-  }
-}
-
-
-loadLocalEnv();
 
 /**
  * Send OTP email using Nodemailer
@@ -56,12 +11,10 @@ const sendorgEmail = async (to, subject, otp) => {
   try {
     // Validate environment variables. If missing, fall back to logging the OTP in dev
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.warn('EMAIL_USER or EMAIL_PASS not set — falling back to console logging the OTP (development only)');
+      console.warn('⚠️ EMAIL_USER or EMAIL_PASS not set — falling back to console logging the OTP (development only)');
       // For development convenience, print OTP to console and return the OTP
       // so flows that depend on OTP can work without a real SMTP provider.
       // NOTE: In production, ensure EMAIL_USER and EMAIL_PASS are set.
-
-    
       return { sent: true, devOtp: otp };
     }
 
@@ -118,13 +71,13 @@ const sendorgEmail = async (to, subject, otp) => {
     };
 
     // Send email
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
     
     return true;
   } catch (error) {
+    console.error('❌ Email sending failed:', error.message);
     throw new Error(`Failed to send email: ${error.message}`);
   }
 };
 
 export default sendorgEmail;
-// ...existing code...

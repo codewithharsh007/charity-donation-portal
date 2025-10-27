@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const stories = [
   {
@@ -50,6 +50,20 @@ const stories = [
 
 export default function UserStories() {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [showAll, setShowAll] = useState(false);
+  const [isMobile, setIsMobile] = useState(false); // ✅ Track if mobile
+
+  // ✅ Detect screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const filteredStories =
     activeFilter === "all"
@@ -57,6 +71,13 @@ export default function UserStories() {
       : stories.filter((story) =>
           story.role.toLowerCase().includes(activeFilter),
         );
+
+  // ✅ Only limit on mobile
+  const displayedStories = (isMobile && !showAll) 
+    ? filteredStories.slice(0, 3) 
+    : filteredStories;
+    
+  const hasMore = isMobile && filteredStories.length > 3;
 
   return (
     <section className="w-full bg-gradient-to-b from-white via-sky-50 to-white py-20">
@@ -88,7 +109,10 @@ export default function UserStories() {
               key={filter.key}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setActiveFilter(filter.key)}
+              onClick={() => {
+                setActiveFilter(filter.key);
+                setShowAll(false);
+              }}
               className={`rounded-md px-5 py-2 text-sm font-semibold transition-all duration-300 ${
                 activeFilter === filter.key
                   ? "bg-emerald-600 text-white shadow"
@@ -102,9 +126,12 @@ export default function UserStories() {
 
         {/* Stories Grid */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredStories.map((item, index) => (
+          {displayedStories.map((item, index) => (
             <motion.div
               key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
               whileHover={{ y: -8, scale: 1.02 }}
               className="group"
             >
@@ -166,6 +193,34 @@ export default function UserStories() {
             </motion.div>
           ))}
         </div>
+
+        {/* ✅ See More Button - Only on Mobile */}
+        {hasMore && (
+          <div className="mt-8 flex justify-center md:hidden">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAll(!showAll)}
+              className="inline-flex items-center gap-2 rounded-md border border-emerald-600 bg-white px-6 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
+            >
+              {showAll ? (
+                <>
+                  Show Less
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </>
+              ) : (
+                <>
+                  See More Stories
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </>
+              )}
+            </motion.button>
+          </div>
+        )}
       </div>
     </section>
   );

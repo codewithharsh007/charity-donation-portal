@@ -477,9 +477,6 @@ export default function RegisterPage() {
   );
 }
 
-{
-  /* <span className="text-red-500">*</span> */
-}
 
 
 

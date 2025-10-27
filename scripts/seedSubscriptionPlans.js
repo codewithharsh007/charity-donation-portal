@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import SubscriptionPlan from '../models/subscriptionPlanModel.js';
 
 // Direct MongoDB connection for scripts (Next.js env vars not available in standalone scripts)
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://harsh07:harsh77qtfleet@learningmongodb.6ibmppi.mongodb.net/CharityDB?retryWrites=true&w=majority&appName=learningMongoDB';
 
 const subscriptionPlansData = [
   {

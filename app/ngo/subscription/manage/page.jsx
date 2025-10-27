@@ -46,7 +46,7 @@ export default function SubscriptionDashboard() {
   };
 
   const handleUpgrade = () => {
-    router.push('/subscription/plans');
+    router.push('/ngo/subscription/plans');
   };
 
   const handleCancelSubscription = async () => {
@@ -355,7 +355,7 @@ export default function SubscriptionDashboard() {
         {/* Back Button */}
         <div className="mt-6 text-center">
           <button
-            onClick={() => router.push('/ngoDashboard')}
+            onClick={() => router.push('/ngo/dashboard')}
             className="text-gray-600 hover:text-gray-800 text-sm font-medium"
           >
             ← Back to Dashboard
