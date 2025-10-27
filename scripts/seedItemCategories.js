@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import ItemCategory from '../models/itemCategoryModel.js';
 
 // Direct MongoDB connection for scripts
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://harsh07:harsh77qtfleet@learningmongodb.6ibmppi.mongodb.net/CharityDB?retryWrites=true&w=majority&appName=learningMongoDB';
 
 const itemCategoriesData = [
   // FREE TIER CATEGORIES (Tier 1)
