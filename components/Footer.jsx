@@ -43,7 +43,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About Section */}
           <div>
-            <h3 className="text-red-600 text-xl font-bold mb-4">DaanSetu</h3>
+            <h3 className="text-red-600 text-xl font-bold mb-4">TheSecondStory</h3>
             <p className="text-sm">
               Making a difference in lives through compassionate giving and support for those in need.
             </p>
@@ -116,7 +116,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-8 pt-6 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} DaanSetu. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} TheSecondStory. All rights reserved.</p>
         </div>
       </div>
     </footer>

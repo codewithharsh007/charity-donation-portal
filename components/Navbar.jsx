@@ -214,6 +214,7 @@ export default function Navbar() {
     pathname?.startsWith("/ngo/dashboard") ||
     pathname?.startsWith("/ngo/marketplace") ||
     pathname?.startsWith("/ngo/request-funding") ||
+    pathname?.startsWith("/verified-ngos") ||
     pathname?.startsWith("/donate") ||
     pathname?.startsWith("/thank-you")
   ) {
@@ -235,7 +236,7 @@ export default function Navbar() {
           {/* Logo */}
           <div className="text-2xl font-bold">
             <Link href="/" className="text-red-500">
-              DaanSetu
+              TheSecondStory
             </Link>
           </div>
 
@@ -282,6 +283,12 @@ export default function Navbar() {
               className="text-white transition-colors hover:text-red-500"
             >
               About
+            </Link>
+            <Link
+              href="/verified-ngos"
+              className="text-white transition-colors hover:text-red-500"
+            >
+              Verified NGOs
             </Link>
             <Link
               href="/contact"
@@ -352,6 +359,12 @@ export default function Navbar() {
                 className="py-2 text-center text-white transition-colors hover:text-red-500"
               >
                 About
+              </Link>
+              <Link
+                href="/verified-ngos"
+                className="text-white transition-colors hover:text-red-500"
+              >
+                Verified NGOs
               </Link>
               <Link
                 href="/contact"

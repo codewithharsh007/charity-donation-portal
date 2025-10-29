@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Toast from '@/components/Toast';
+import toast from 'react-hot-toast'; // ✅ Import react-hot-toast
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -17,9 +17,6 @@ export default function CheckoutPage() {
   const [isTrial, setIsTrial] = useState(false);
   const [testMode, setTestMode] = useState(false);
 
-  // Toast state
-  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
-
   // Test payment modal state
   const [showTestModal, setShowTestModal] = useState(false);
   const [testOrderData, setTestOrderData] = useState(null);
@@ -29,10 +26,6 @@ export default function CheckoutPage() {
       fetchPlanDetails();
     }
   }, [planId]);
-
-  const showToast = (message, type = 'info', duration = 3000) => {
-    setToast({ show: true, message, type, duration });
-  };
 
   const fetchPlanDetails = async () => {
     try {
@@ -44,7 +37,7 @@ export default function CheckoutPage() {
       }
     } catch (error) {
       console.error('Error fetching plan:', error);
-      showToast('Error fetching plan details.', 'error');
+      toast.error('Error fetching plan details.');
     } finally {
       setLoading(false);
     }
@@ -64,6 +57,8 @@ export default function CheckoutPage() {
     try {
       // Check if trial
       if (isTrial) {
+        const loadingToast = toast.loading('Activating trial...');
+        
         const response = await fetch('/api/subscriptions/create', {
           method: 'POST',
           headers: {
@@ -78,7 +73,7 @@ export default function CheckoutPage() {
         });
 
         if (response.status === 401 || response.status === 403) {
-          showToast('Please login first', 'warning');
+          toast.error('Please login first', { id: loadingToast });
           setTimeout(() => router.push('/login'), 1200);
           setProcessing(false);
           return;
@@ -87,20 +82,21 @@ export default function CheckoutPage() {
         const data = await response.json();
 
         if (data.success) {
-          showToast('Trial activated successfully!', 'success');
-          // ✅ Wait a bit for database to update, then redirect
+          toast.success('Trial activated successfully! 🎉', { id: loadingToast });
           setTimeout(() => {
             router.push('/ngo/dashboard');
-            router.refresh(); // Force refresh the page
+            router.refresh();
           }, 1500);
         } else {
-          showToast(data.message || 'Failed to activate trial', 'error');
+          toast.error(data.message || 'Failed to activate trial', { id: loadingToast });
         }
         setProcessing(false);
         return;
       }
 
       // Create payment order
+      const loadingToast = toast.loading('Creating payment order...');
+      
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: {
@@ -114,17 +110,17 @@ export default function CheckoutPage() {
       });
 
       if (orderResponse.status === 401 || orderResponse.status === 403) {
-        showToast('Please login first', 'warning');
+        toast.error('Please login first', { id: loadingToast });
         setTimeout(() => router.push('/login'), 1200);
         setProcessing(false);
         return;
       }
 
       const orderData = await orderResponse.json();
-      
+      toast.dismiss(loadingToast);
 
       if (!orderData.success) {
-        showToast(orderData.message || 'Failed to create payment order', 'error');
+        toast.error(orderData.message || 'Failed to create payment order');
         setProcessing(false);
         return;
       }
@@ -139,16 +135,16 @@ export default function CheckoutPage() {
       }
     } catch (error) {
       console.error('Payment error:', error);
-      showToast('Payment failed. Please try again.', 'error');
+      toast.error('Payment failed. Please try again.');
       setProcessing(false);
     }
   };
 
   const handleTestPayment = async () => {
     setShowTestModal(false);
+    const loadingToast = toast.loading('Processing test payment...');
+    
     try {
-      
-      // Get test payment details
       const testResponse = await fetch('/api/payments/test-complete', {
         method: 'POST',
         headers: {
@@ -161,18 +157,17 @@ export default function CheckoutPage() {
       });
 
       if (testResponse.status === 401 || testResponse.status === 403) {
-        showToast('Please login first', 'warning');
+        toast.error('Please login first', { id: loadingToast });
         setTimeout(() => router.push('/login'), 1200);
         setProcessing(false);
         return;
       }
 
       const testData = await testResponse.json();
-      
 
       if (testData.success) {
         // Verify the payment
-          const verifyResponse = await fetch('/api/payments/verify', {
+        const verifyResponse = await fetch('/api/payments/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -187,34 +182,34 @@ export default function CheckoutPage() {
         });
 
         if (verifyResponse.status === 401 || verifyResponse.status === 403) {
-          showToast('Please login first', 'warning');
+          toast.error('Please login first', { id: loadingToast });
           setTimeout(() => router.push('/login'), 1200);
           setProcessing(false);
           return;
         }
 
         const verifyData = await verifyResponse.json();
-        
 
         if (verifyData.success) {
-          showToast('🎉 Payment successful! Subscription activated to ' + verifyData.plan.displayName, 'success', 5000);
-          
-          // ✅ CRITICAL FIX: Wait for database to fully update, then redirect
+          toast.success(
+            `🎉 Payment successful! Subscription activated to ${verifyData.plan.displayName}`,
+            { id: loadingToast, duration: 5000 }
+          );
+
           setTimeout(() => {
-            // Force hard navigation to ensure fresh data
             window.location.href = '/ngo/dashboard';
           }, 2000);
         } else {
-          showToast(verifyData.message || 'Payment verification failed', 'error');
+          toast.error(verifyData.message || 'Payment verification failed', { id: loadingToast });
           setProcessing(false);
         }
       } else {
-        showToast(testData.message || 'Failed to get test credentials', 'error');
+        toast.error(testData.message || 'Failed to get test credentials', { id: loadingToast });
         setProcessing(false);
       }
     } catch (error) {
       console.error('Test payment error:', error);
-      showToast('Test payment failed: ' + error.message, 'error');
+      toast.error('Test payment failed: ' + error.message, { id: loadingToast });
       setProcessing(false);
     }
   };
@@ -229,8 +224,9 @@ export default function CheckoutPage() {
         description: `${orderData.plan.displayName} - ${billingCycle}`,
         order_id: orderData.orderId,
         handler: async function (response) {
+          const loadingToast = toast.loading('Verifying payment...');
+          
           try {
-            // Verify payment
             const verifyResponse = await fetch('/api/payments/verify', {
               method: 'POST',
               headers: {
@@ -248,19 +244,23 @@ export default function CheckoutPage() {
             const verifyData = await verifyResponse.json();
 
             if (verifyData.success) {
-              showToast('🎉 Payment successful! Subscription activated.', 'success', 5000);
-              
-              // ✅ Wait for database update, then redirect
+              toast.success('🎉 Payment successful! Subscription activated.', {
+                id: loadingToast,
+                duration: 5000,
+              });
+
               setTimeout(() => {
                 window.location.href = '/ngo/dashboard';
               }, 2000);
             } else {
-              showToast(verifyData.message || 'Payment verification failed', 'error');
+              toast.error(verifyData.message || 'Payment verification failed', {
+                id: loadingToast,
+              });
               setProcessing(false);
             }
           } catch (err) {
             console.error('Verification error:', err);
-            showToast('Payment verification failed', 'error');
+            toast.error('Payment verification failed', { id: loadingToast });
             setProcessing(false);
           }
         },
@@ -272,23 +272,23 @@ export default function CheckoutPage() {
           color: '#3b82f6',
         },
         modal: {
-          ondismiss: function() {
+          ondismiss: function () {
             setProcessing(false);
-            showToast('Payment cancelled', 'info');
-          }
-        }
+            toast('Payment cancelled', { icon: 'ℹ️' });
+          },
+        },
       };
 
       const razorpay = new window.Razorpay(options);
       razorpay.on('payment.failed', function (response) {
         console.error('Payment failed:', response.error);
-        showToast('Payment failed: ' + response.error.description, 'error');
+        toast.error('Payment failed: ' + response.error.description);
         setProcessing(false);
       });
       razorpay.open();
     } catch (error) {
       console.error('Razorpay error:', error);
-      showToast('Failed to initialize payment', 'error');
+      toast.error('Failed to initialize payment');
       setProcessing(false);
     }
   };
@@ -448,8 +448,20 @@ export default function CheckoutPage() {
                     {processing ? (
                       <span className="flex items-center justify-center">
                         <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
                         </svg>
                         Processing...
                       </span>
@@ -485,24 +497,11 @@ export default function CheckoutPage() {
 
         {/* Cancel Link */}
         <div className="text-center mt-6">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900 text-sm"
-          >
+          <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-900 text-sm">
             ← Back to plans
           </button>
         </div>
       </div>
-
-      {/* Toast Notification */}
-      {toast.show && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          duration={toast.duration || 3000}
-          onClose={() => setToast({ ...toast, show: false })}
-        />
-      )}
 
       {/* Test Payment Modal */}
       {showTestModal && testOrderData && (
@@ -510,8 +509,10 @@ export default function CheckoutPage() {
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-sm w-full">
             <h2 className="text-xl font-bold mb-2 text-blue-700">🧪 Test Mode Payment</h2>
             <p className="mb-4 text-gray-700">
-              <span className="font-semibold">Plan:</span> {plan.displayName}<br />
-              <span className="font-semibold">Amount:</span> ₹{testOrderData.amount?.toFixed(2)}<br />
+              <span className="font-semibold">Plan:</span> {plan.displayName}
+              <br />
+              <span className="font-semibold">Amount:</span> ₹{testOrderData.amount?.toFixed(2)}
+              <br />
               <span className="font-semibold">Order ID:</span> {testOrderData.orderId}
             </p>
             <p className="mb-4 text-gray-600 text-sm">

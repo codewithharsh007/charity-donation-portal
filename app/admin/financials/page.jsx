@@ -114,9 +114,25 @@ export default function AdminFinancialsPage() {
     .filter((e) => e.status === "paid")
     .reduce((sum, e) => sum + e.amount, 0);
 
+  const thisMonthExpenses = expenses
+    .filter((e) => {
+      if (e.status !== "paid") return false;
+      const expenseDate = new Date(e.date);
+      const now = new Date();
+      return (
+        expenseDate.getMonth() === now.getMonth() &&
+        expenseDate.getFullYear() === now.getFullYear()
+      );
+    })
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const actualRevenue = financials?.subscriptionRevenue?.allTime || 0;
+  
+  const netProfit = actualRevenue - totalExpenses;
+
+  const totalDonations = financials?.donations?.allTime || 0;
   const totalFunding = financials?.fundingRequests?.allTime || 0;
-  const netProfit =
-    (financials?.netRevenue || 0) - totalExpenses - totalFunding;
+  const donationPoolBalance = totalDonations - totalFunding;
 
   return (
     <div className="min-h-screen px-4 py-8">
@@ -139,20 +155,10 @@ export default function AdminFinancialsPage() {
           </button>
         </div>
 
-        {/* Revenue Overview */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-6">
-          <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 p-6 shadow-xl">
-            <p className="text-sm font-medium text-indigo-100">Total Revenue</p>
-            <p className="mt-2 text-3xl font-bold text-white">
-              {formatCurrency(financials?.totalRevenue)}
-            </p>
-            <p className="mt-1 text-xs text-indigo-200">
-              Subscriptions + Donations
-            </p>
-          </div>
-
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-5">
+          {/* ✅ Subscription Revenue */}
           <div className="rounded-2xl bg-gradient-to-br from-green-600 to-green-700 p-6 shadow-xl">
-            <p className="text-sm font-medium text-green-100">Subscriptions</p>
+            <p className="text-sm font-medium text-green-100">Subscription Revenue</p>
             <p className="mt-2 text-3xl font-bold text-white">
               {formatCurrency(financials?.subscriptionRevenue?.allTime)}
             </p>
@@ -161,16 +167,7 @@ export default function AdminFinancialsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-6 shadow-xl">
-            <p className="text-sm font-medium text-blue-100">Donations</p>
-            <p className="mt-2 text-3xl font-bold text-white">
-              {formatCurrency(financials?.donations?.allTime)}
-            </p>
-            <p className="mt-1 text-xs text-blue-200">
-              {financials?.donations?.count} donations
-            </p>
-          </div>
-
+          {/* ✅ Total Expenses */}
           <div className="rounded-2xl bg-gradient-to-br from-red-600 to-red-700 p-6 shadow-xl">
             <p className="text-sm font-medium text-red-100">Total Expenses</p>
             <p className="mt-2 text-3xl font-bold text-white">
@@ -181,46 +178,55 @@ export default function AdminFinancialsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-br from-orange-600 to-orange-700 p-6 shadow-xl">
-            <p className="text-sm font-medium text-orange-100">NGO Funding</p>
-            <p className="mt-2 text-3xl font-bold text-white">
-              {formatCurrency(financials?.fundingRequests?.allTime)}
-            </p>
-            <p className="mt-1 text-xs text-orange-200">
-              {financials?.fundingRequests?.count} approved
-            </p>
-          </div>
-
+          {/* ✅ Net Profit */}
           <div className="rounded-2xl bg-gradient-to-br from-purple-600 to-purple-700 p-6 shadow-xl">
             <p className="text-sm font-medium text-purple-100">Net Profit</p>
             <p
               className={`mt-2 text-3xl font-bold ${
-                (financials?.totalRevenue || 0) -
-                  totalExpenses -
-                  (financials?.fundingRequests?.allTime || 0) >=
-                0
-                  ? "text-white"
-                  : "text-red-200"
+                netProfit >= 0 ? "text-white" : "text-red-200"
               }`}
             >
-              {formatCurrency(
-                (financials?.totalRevenue || 0) -
-                  totalExpenses -
-                  (financials?.fundingRequests?.allTime || 0),
-              )}
+              {formatCurrency(netProfit)}
             </p>
             <p className="mt-1 text-xs text-purple-200">
-              Revenue - All Expenses
+              Subscription - Expenses
+            </p>
+          </div>
+
+          {/* ✅ Donation Pool (Separate Tracking) */}
+          <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-6 shadow-xl">
+            <p className="text-sm font-medium text-blue-100">Donation Pool</p>
+            <p className="mt-2 text-3xl font-bold text-white">
+              {formatCurrency(totalDonations)}
+            </p>
+            <p className="mt-1 text-xs text-blue-200">
+              {financials?.donations?.count} donations
+            </p>
+          </div>
+
+          {/* ✅ Donation Pool Balance */}
+          <div className="rounded-2xl bg-gradient-to-br from-orange-600 to-orange-700 p-6 shadow-xl">
+            <p className="text-sm font-medium text-orange-100">Pool Balance</p>
+            <p
+              className={`mt-2 text-3xl font-bold ${
+                donationPoolBalance >= 0 ? "text-white" : "text-red-200"
+              }`}
+            >
+              {formatCurrency(donationPoolBalance)}
+            </p>
+            <p className="mt-1 text-xs text-orange-200">
+              Donations - NGO Funding
             </p>
           </div>
         </div>
 
-        {/* This Month Performance */}
+        {/* ✅ UPDATED: This Month Performance */}
         <div className="mb-8 rounded-2xl bg-gray-800 p-6 shadow-xl">
           <h3 className="mb-4 text-xl font-bold text-white">
             This Month Performance
           </h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            {/* ✅ Subscription Revenue (Main) */}
             <div className="rounded-lg bg-gray-700 p-4">
               <p className="text-sm text-gray-400">Subscription Revenue</p>
               <p className="mt-2 text-2xl font-bold text-white">
@@ -234,61 +240,61 @@ export default function AdminFinancialsPage() {
               </p>
             </div>
 
+            {/* ✅ This Month Expenses */}
             <div className="rounded-lg bg-gray-700 p-4">
-              <p className="text-sm text-gray-400">Donation Revenue</p>
-              <p className="mt-2 text-2xl font-bold text-white">
+              <p className="text-sm text-gray-400">Operating Expenses</p>
+              <p className="mt-2 text-2xl font-bold text-red-400">
+                -{formatCurrency(thisMonthExpenses)}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                {expenses.filter((e) => {
+                  if (e.status !== "paid") return false;
+                  const expenseDate = new Date(e.date);
+                  const now = new Date();
+                  return (
+                    expenseDate.getMonth() === now.getMonth() &&
+                    expenseDate.getFullYear() === now.getFullYear()
+                  );
+                }).length}{" "}
+                expenses
+              </p>
+            </div>
+
+            {/* ✅ Net Profit This Month */}
+            <div className="rounded-lg border border-green-500/50 bg-green-600/20 p-4">
+              <p className="text-sm text-green-300">Net Profit (This Month)</p>
+              <p className="mt-2 text-2xl font-bold text-green-400">
+                {formatCurrency(
+                  (financials?.subscriptionRevenue?.thisMonth || 0) -
+                    thisMonthExpenses,
+                )}
+              </p>
+              <p className="mt-1 text-xs text-green-300">Subscriptions - Expenses</p>
+            </div>
+
+            {/* ✅ Donation Activity This Month */}
+            <div className="rounded-lg bg-gray-700 p-4">
+              <p className="text-sm text-gray-400">Donations This Month</p>
+              <p className="mt-2 text-2xl font-bold text-blue-400">
                 {formatCurrency(financials?.donations?.thisMonth || 0)}
               </p>
               <p className="mt-1 text-xs text-gray-400">
                 {financials?.donations?.monthlyCount || 0} donations
               </p>
             </div>
-
-            {/* ✅ FIXED: NGO Funding (Expense) */}
-            <div className="rounded-lg bg-gray-700 p-4">
-              <p className="text-sm text-gray-400">NGO Funding (Expense)</p>
-              <p className="mt-2 text-2xl font-bold text-orange-400">
-                -{formatCurrency(financials?.fundingRequests?.thisMonth || 0)}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">
-                {financials?.fundingRequests?.monthlyCount || 0} approved
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-green-500/50 bg-green-600/20 p-4">
-              <p className="text-sm text-green-300">Net This Month</p>
-              <p className="mt-2 text-2xl font-bold text-green-400">
-                {formatCurrency(
-                  (financials?.subscriptionRevenue?.thisMonth || 0) +
-                    (financials?.donations?.thisMonth || 0) -
-                    (financials?.fundingRequests?.thisMonth || 0) -
-                    expenses
-                      .filter((e) => {
-                        if (e.status !== "paid") return false;
-                        const expenseDate = new Date(e.date);
-                        const now = new Date();
-                        return (
-                          expenseDate.getMonth() === now.getMonth() &&
-                          expenseDate.getFullYear() === now.getFullYear()
-                        );
-                      })
-                      .reduce((sum, e) => sum + e.amount, 0),
-                )}
-              </p>
-              <p className="mt-1 text-xs text-green-300">After all expenses</p>
-            </div>
           </div>
         </div>
 
-        {/* Revenue Breakdown */}
+        {/* ✅ UPDATED: Two Column Layout */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* ✅ Revenue Breakdown (Subscriptions Only) */}
           <div className="rounded-2xl bg-gray-800 p-6 shadow-xl">
             <h3 className="mb-4 text-xl font-bold text-white">
-              Revenue Breakdown
+              Subscription Revenue Breakdown
             </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-lg bg-gray-700 p-3">
-                <span className="text-gray-300">Subscription Revenue</span>
+                <span className="text-gray-300">Subscription Subtotal</span>
                 <span className="font-semibold text-white">
                   {formatCurrency(financials?.subscriptionRevenue?.subtotal)}
                 </span>
@@ -307,7 +313,7 @@ export default function AdminFinancialsPage() {
               </div>
               <div className="flex items-center justify-between rounded-lg border border-green-500/50 bg-green-600/20 p-3">
                 <span className="font-semibold text-green-300">
-                  Net Revenue
+                  Net Subscription Revenue
                 </span>
                 <span className="text-lg font-bold text-green-400">
                   {formatCurrency(financials?.netRevenue)}
@@ -316,6 +322,7 @@ export default function AdminFinancialsPage() {
             </div>
           </div>
 
+          {/* ✅ Revenue by Tier */}
           <div className="rounded-2xl bg-gray-800 p-6 shadow-xl">
             <h3 className="mb-4 text-xl font-bold text-white">
               Revenue by Tier
@@ -352,46 +359,53 @@ export default function AdminFinancialsPage() {
             </div>
           </div>
         </div>
-        {/* ✅ NGO Funding Breakdown - FULL WIDTH */}
-        <div className="mb-8 rounded-2xl bg-gray-800 p-6 shadow-xl">
+
+        {/* ✅ NEW: Donation Pool Management - Full Width */}
+        <div className="mb-8 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-900 p-6 shadow-xl">
           <h3 className="mb-4 text-xl font-bold text-white">
-            NGO Funding Breakdown
+            💝 Donation Management
           </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg bg-gray-700 p-3">
-              <span className="text-gray-300">Total Approved Requests</span>
-              <span className="font-semibold text-white">
-                {financials?.fundingRequests?.count || 0}
-              </span>
+          <p className="mb-4 text-sm text-blue-200">
+            Donations are kept separate from business revenue and used exclusively for NGO funding
+          </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-lg bg-white/10 p-4 backdrop-blur">
+              <p className="text-sm text-blue-200">Total Donations Received</p>
+              <p className="mt-2 text-3xl font-bold text-white">
+                {formatCurrency(totalDonations)}
+              </p>
+              <p className="mt-1 text-xs text-blue-300">
+                {financials?.donations?.count || 0} donations
+              </p>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-gray-700 p-3">
-              <span className="text-gray-300">Total Funding Allocated</span>
-              <span className="font-semibold text-orange-400">
-                {formatCurrency(financials?.fundingRequests?.allTime)}
-              </span>
+
+            <div className="rounded-lg bg-white/10 p-4 backdrop-blur">
+              <p className="text-sm text-orange-200">NGO Funding Allocated</p>
+              <p className="mt-2 text-3xl font-bold text-orange-300">
+                {formatCurrency(totalFunding)}
+              </p>
+              <p className="mt-1 text-xs text-orange-300">
+                {financials?.fundingRequests?.count || 0} approved requests
+              </p>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-gray-700 p-3">
-              <span className="text-gray-300">This Month</span>
-              <span className="font-semibold text-orange-400">
-                {formatCurrency(financials?.fundingRequests?.thisMonth)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-purple-500/50 bg-purple-600/20 p-3">
-              <span className="font-semibold text-purple-300">
-                Available After Funding
-              </span>
-              <span className="text-lg font-bold text-purple-400">
-                {formatCurrency(
-                  (financials?.netRevenue || 0) -
-                    (financials?.fundingRequests?.allTime || 0) -
-                    totalExpenses,
-                )}
-              </span>
+
+            <div className="rounded-lg border-2 border-white/30 bg-white/10 p-4 backdrop-blur">
+              <p className="text-sm text-green-200">Available for NGOs</p>
+              <p
+                className={`mt-2 text-3xl font-bold ${
+                  donationPoolBalance >= 0 ? "text-green-300" : "text-red-300"
+                }`}
+              >
+                {formatCurrency(donationPoolBalance)}
+              </p>
+              <p className="mt-1 text-xs text-green-300">
+                {donationPoolBalance >= 0 ? "Available" : "Overspent"}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Expenses Table */}
+        {/* ✅ Expenses Table - No Changes Needed */}
         <div className="overflow-hidden rounded-2xl bg-gray-800 shadow-2xl">
           <div className="border-b border-gray-700 p-6">
             <h3 className="text-xl font-bold text-white">
@@ -402,19 +416,19 @@ export default function AdminFinancialsPage() {
             <table className="w-full">
               <thead className="bg-gray-900">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-400">
                     Title
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-400">
                     Category
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-400">
                     Amount
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-400">
                     Date
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-gray-400">
                     Status
                   </th>
                 </tr>
@@ -482,7 +496,7 @@ export default function AdminFinancialsPage() {
         </div>
       </div>
 
-      {/* Add Expense Modal */}
+      {/* Add Expense Modal - No Changes Needed */}
       {showAddExpense && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-gray-800 p-6">

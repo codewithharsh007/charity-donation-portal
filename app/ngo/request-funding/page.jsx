@@ -34,6 +34,10 @@ export default function FundingRequestPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [filter, setFilter] = useState("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [monthlyFundingReceived, setMonthlyFundingReceived] = useState(0);
+  const [monthlyLimit, setMonthlyLimit] = useState(0);
+  const [remainingMonthlyAllocation, setRemainingMonthlyAllocation] =
+    useState(0);
   const [fundingLoading, setFundingLoading] = useState(false);
 
   // Subscription & Verification
@@ -51,7 +55,7 @@ export default function FundingRequestPage() {
   }, []);
 
   useEffect(() => {
-    // ✅ FIXED: Check for both "verified" AND "accepted"
+    // Check for both "verified" AND "accepted"
     if (
       !loading &&
       (verificationStatus === "verified" ||
@@ -94,10 +98,18 @@ export default function FundingRequestPage() {
         const name = subscriptionData.data.tierName || "FREE";
         setCurrentTier(tier);
         setTierName(name);
-        console.log(`✅ Set Tier: ${name} (${tier})`);
+
+        // Set monthly limit based on tier
+        const limit = getMonthlyLimit(tier);
+        setMonthlyLimit(limit);
+
+        console.log(
+          `✅ Set Tier: ${name} (${tier}) - Monthly Limit: ₹${limit.toLocaleString()}`,
+        );
       } else {
         setCurrentTier(1);
         setTierName("FREE");
+        setMonthlyLimit(0);
       }
 
       // Set verification - ACCEPT BOTH "verified" AND "accepted"
@@ -109,7 +121,7 @@ export default function FundingRequestPage() {
         setVerificationStatus("pending");
       }
 
-      // ✅ FIXED: Check for BOTH "verified" AND "accepted"
+      // Check for BOTH "verified" AND "accepted"
       const status = verifyData.verification?.verificationStatus;
       const isVerified = status === "verified" || status === "accepted";
       const tier = subscriptionData.data?.currentTier || 1;
@@ -130,15 +142,45 @@ export default function FundingRequestPage() {
       setCurrentTier(1);
       setTierName("FREE");
       setVerificationStatus("pending");
+      setMonthlyLimit(0);
     } finally {
       setLoading(false);
     }
   };
 
+  const getMonthlyLimit = (tier) => {
+    if (tier === 4) return 50000; 
+    if (tier === 3) return 20000; 
+    return 0;
+  };
+
+  const calculateMonthlyFunding = (allRequests) => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Sum up approved amounts for this month
+    const thisMonthApproved = allRequests
+      .filter((r) => {
+        if (r.adminStatus !== "approved" || !r.approvedAmount) return false;
+
+        // Check if approved this month
+        const approvedDate = r.adminReviewedAt
+          ? new Date(r.adminReviewedAt)
+          : new Date(r.createdAt);
+        return (
+          approvedDate.getMonth() === currentMonth &&
+          approvedDate.getFullYear() === currentYear
+        );
+      })
+      .reduce((sum, r) => sum + (r.approvedAmount || 0), 0);
+
+    return thisMonthApproved;
+  };
+
   const fetchRequests = async () => {
     try {
       const userData = JSON.parse(localStorage.getItem("user"));
-
       const res = await fetch("/api/ngo/funding-requests", {
         headers: {
           Authorization: `Bearer ${userData.token}`,
@@ -155,6 +197,19 @@ export default function FundingRequestPage() {
         }
 
         setRequests(filtered);
+
+        // Calculate monthly funding received
+        const monthlyReceived = calculateMonthlyFunding(data.requests || []);
+        setMonthlyFundingReceived(monthlyReceived);
+
+        // Calculate remaining allocation
+        const remaining = monthlyLimit - monthlyReceived;
+        setRemainingMonthlyAllocation(remaining > 0 ? remaining : 0);
+
+        console.log(
+          `💰 Monthly Received: ₹${monthlyReceived.toLocaleString()}, Remaining: ₹${remaining.toLocaleString()}`,
+        );
+
         checkCanCreateNew(data.requests || []);
       }
     } catch (err) {
@@ -163,7 +218,6 @@ export default function FundingRequestPage() {
   };
 
   const checkCanCreateNew = (allRequests) => {
-    // ✅ FIXED: Only block if there's a PENDING or UNDER_REVIEW request
     const activeRequest = allRequests.find(
       (r) => r.adminStatus === "pending" || r.adminStatus === "under_review",
     );
@@ -176,23 +230,14 @@ export default function FundingRequestPage() {
       return;
     }
 
-    // Check monthly limit
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const monthlyReceived = calculateMonthlyFunding(allRequests);
 
-    const thisMonthRequests = allRequests.filter((r) => {
-      const reqDate = new Date(r.createdAt);
-      return (
-        reqDate.getMonth() === currentMonth &&
-        reqDate.getFullYear() === currentYear
-      );
-    });
-
-    if (thisMonthRequests.length > 0) {
+    if (monthlyReceived >= monthlyLimit) {
       setCanCreateNew(false);
       setBlockReason(
-        "You can only create one funding request per month. Your monthly limit has been reached.",
+        `You have reached your monthly funding limit of ₹${monthlyLimit.toLocaleString()}. ` +
+          `You've received ₹${monthlyReceived.toLocaleString()} this month. ` +
+          `Your limit will reset on the 1st of next month.`,
       );
       return;
     }
@@ -267,8 +312,8 @@ export default function FundingRequestPage() {
   };
 
   const getMaxAmount = () => {
-    if (currentTier === 4) return 50000; // Gold: ₹50,000
-    if (currentTier === 3) return 20000; // Silver: ₹20,000
+    if (currentTier === 4) return 50000; 
+    if (currentTier === 3) return 20000; 
     return 0;
   };
 
@@ -284,7 +329,7 @@ export default function FundingRequestPage() {
     );
   }
 
-  // ✅ FIXED: Accept both "verified" AND "accepted"
+  // Accept both "verified" AND "accepted"
   const isVerified =
     verificationStatus === "verified" || verificationStatus === "accepted";
 
@@ -306,7 +351,8 @@ export default function FundingRequestPage() {
                     Funding Requests
                   </h1>
                   <p className="hidden text-xs text-gray-400 sm:block">
-                    {tierName} Tier • Max: ₹{getMaxAmount().toLocaleString()}
+                    {tierName} Tier • Monthly Limit: ₹
+                    {monthlyLimit.toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -348,8 +394,10 @@ export default function FundingRequestPage() {
             {isMobileMenuOpen && (
               <div className="mt-4 space-y-2 border-t border-gray-700 pt-4 sm:hidden">
                 <p className="mb-2 text-xs text-gray-400">
-                  {tierName} Tier • Max: ₹{getMaxAmount().toLocaleString()}
+                  {tierName} Tier • Monthly Limit: ₹
+                  {monthlyLimit.toLocaleString()}
                 </p>
+
                 <button
                   onClick={() => {
                     router.push("/");
@@ -373,6 +421,84 @@ export default function FundingRequestPage() {
             )}
           </div>
         </header>
+
+        {/* ✅ NEW: Monthly Funding Limit Banner */}
+        <div className="mb-6 rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-600/10 to-purple-600/10 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-300">
+                Monthly Funding Allocation
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                You can make multiple requests per month until you reach your
+                limit
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-400">Monthly Limit</p>
+              <p className="text-2xl font-bold text-white">
+                ₹{monthlyLimit.toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">Approved This Month</span>
+              <span className="font-semibold text-green-400">
+                ₹{monthlyFundingReceived.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">Remaining Allocation</span>
+              <span
+                className={`font-semibold ${remainingMonthlyAllocation > 0 ? "text-blue-400" : "text-red-400"}`}
+              >
+                ₹{remainingMonthlyAllocation.toLocaleString()}
+              </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-700">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  monthlyFundingReceived >= monthlyLimit
+                    ? "bg-red-500"
+                    : monthlyFundingReceived > monthlyLimit * 0.7
+                      ? "bg-yellow-500"
+                      : "bg-green-500"
+                }`}
+                style={{
+                  width: `${Math.min((monthlyFundingReceived / monthlyLimit) * 100, 100)}%`,
+                }}
+              />
+            </div>
+            <p className="text-center text-xs text-gray-500">
+              {Math.round((monthlyFundingReceived / monthlyLimit) * 100)}% of
+              monthly limit used
+            </p>
+
+            {/* ✅ NEW: Info message */}
+            {remainingMonthlyAllocation > 0 ? (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-blue-500/10 p-3">
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-400" />
+                <p className="text-xs text-blue-300">
+                  You can submit multiple funding requests this month until you
+                  reach ₹{monthlyLimit.toLocaleString()}. Currently, you have ₹
+                  {remainingMonthlyAllocation.toLocaleString()} remaining.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-500/10 p-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-400" />
+                <p className="text-xs text-red-300">
+                  Monthly limit reached! You cannot submit new requests until
+                  the 1st of next month.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Upgrade Content */}
         <div className="mx-auto max-w-7xl px-4 py-12">
@@ -413,10 +539,10 @@ export default function FundingRequestPage() {
                         Silver Tier
                       </h3>
                       <p className="mb-3 text-2xl font-bold text-white">
-                        ₹5,00,000
+                        ₹20,000
                       </p>
                       <p className="text-sm text-gray-400">
-                        Maximum request amount
+                        Monthly funding limit
                       </p>
                     </div>
 
@@ -430,10 +556,10 @@ export default function FundingRequestPage() {
                         Gold Tier
                       </h3>
                       <p className="mb-3 text-2xl font-bold text-white">
-                        ₹10,00,000
+                        ₹50,000
                       </p>
                       <p className="text-sm text-gray-400">
-                        Maximum request amount
+                        Monthly funding limit
                       </p>
                     </div>
                   </div>
@@ -491,7 +617,6 @@ export default function FundingRequestPage() {
               >
                 Dashboard
               </button>
-              
 
               {/* Mobile Menu Toggle */}
               <button
@@ -533,7 +658,6 @@ export default function FundingRequestPage() {
               >
                 Dashboard
               </button>
-              
             </div>
           )}
         </div>
@@ -552,20 +676,22 @@ export default function FundingRequestPage() {
           {canCreateNew ? (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:from-green-700 hover:to-emerald-700"
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-red-700"
             >
               <Plus className="h-5 w-5" />
-              New Request
+              Create New Request
             </button>
           ) : (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4">
               <div className="flex items-start gap-3">
-                <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
+                <Lock className="mt-1 h-5 w-5 flex-shrink-0 text-yellow-400" />
                 <div>
-                  <p className="text-sm font-medium text-amber-400">
-                    Cannot Create New Request
+                  <p className="font-semibold text-yellow-300">
+                    {monthlyFundingReceived >= monthlyLimit
+                      ? "Monthly Limit Reached"
+                      : "Request Pending"}
                   </p>
-                  <p className="mt-1 text-xs text-gray-300">{blockReason}</p>
+                  <p className="mt-1 text-sm text-gray-300">{blockReason}</p>
                 </div>
               </div>
             </div>
@@ -785,11 +911,9 @@ export default function FundingRequestPage() {
       {showCreateModal && (
         <FundingRequestForm
           onClose={() => setShowCreateModal(false)}
-          onSuccess={() => {
-            fetchRequests(); // Refresh the list
-            setShowCreateModal(false);
-          }}
+          onSuccess={fetchRequests}
           currentTier={currentTier}
+          remainingMonthlyAllocation={remainingMonthlyAllocation}
         />
       )}
 

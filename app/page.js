@@ -3,6 +3,8 @@ import AboutPreview from "@/components/AboutPreview";
 import ProcessForWebsite from "@/components/processForWebsite";
 import FeedbackCard from "@/components/Feedback";
 import UserStories from "@/components/Story";
+import AIPage from "@/components/FloatingHelp";
+
 
 export default function Home() {
   return (
@@ -14,6 +16,7 @@ export default function Home() {
         <UserStories />
         <AboutPreview />
       </div>
+      <AIPage />
     </>
   );
 }

@@ -55,6 +55,9 @@ export default function NgoDashboardPage() {
     pincode: "",
   });
   const [profileMessage, setProfileMessage] = useState("");
+  const [financialDonations, setFinancialDonations] = useState(0);
+  const [fundingRequests, setFundingRequests] = useState([]);
+  const [fundingLoading, setFundingLoading] = useState(false);
 
   useEffect(() => {
     fetchDonations();
@@ -70,7 +73,11 @@ export default function NgoDashboardPage() {
       setIsInitialLoading(true);
 
       // Fetch all NGO data
-      await Promise.all([fetchSubscription(), fetchDonations()]);
+      await Promise.all([
+        fetchSubscription(),
+        fetchDonations(),
+        fetchFundingRequests(),
+      ]);
 
       await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
@@ -183,8 +190,18 @@ export default function NgoDashboardPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setFundingRequests(data.requests || []);
-        console.log("✅ Funding requests loaded:", data.requests.length);
+        const requests = data.requests || [];
+        setFundingRequests(requests);
+
+        // ✅ Calculate total financial donations (approved requests only)
+        const totalFinancial = requests
+          .filter((req) => req.adminStatus === "approved")
+          .reduce((sum, req) => sum + (req.approvedAmount || 0), 0);
+
+        setFinancialDonations(totalFinancial);
+
+        console.log("✅ Funding requests loaded:", requests.length);
+        console.log("✅ Total financial donations:", totalFinancial);
       } else {
         console.log("❌ Error loading funding requests:", data.message);
       }
@@ -555,8 +572,20 @@ export default function NgoDashboardPage() {
                   Subscription
                 </button>
               )}
+
               {/* ✅ NEW: Request Funding Button (Silver/Gold Only) */}
-              {isVerified() && currentTier >= 3 ? (
+              {!isVerified() ? (
+                // NOT VERIFIED - Disabled
+                <button
+                  disabled
+                  title="Complete verification first to access funding requests"
+                  className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-gray-700 px-5 py-2.5 text-sm font-semibold text-gray-500 opacity-50"
+                >
+                  <Lock className="h-4 w-4" />
+                  Ask Funds
+                </button>
+              ) : currentTier >= 3 ? (
+                // VERIFIED + SILVER/GOLD - Active button to request funding
                 <button
                   onClick={() => router.push("/ngo/request-funding")}
                   className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:from-green-700 hover:to-emerald-700 hover:shadow-lg"
@@ -564,25 +593,19 @@ export default function NgoDashboardPage() {
                   <DollarSign className="h-4 w-4" />
                   Ask Funds
                 </button>
-              ) : currentTier < 3 ? (
+              ) : (
+                // VERIFIED but FREE/BRONZE - Locked, click to upgrade
                 <button
                   onClick={() => router.push("/ngo/subscription/plans")}
-                  title="Upgrade to Silver or Gold to ask for funds"
-                  className="flex items-center gap-2 rounded-lg bg-gray-700 px-5 py-2.5 text-sm font-semibold text-gray-400 transition-all hover:bg-gray-600"
+                  title="Upgrade to Silver or Gold tier to request funding"
+                  className="flex items-center gap-2 rounded-lg bg-gray-700 px-5 py-2.5 text-sm font-semibold text-gray-400 transition-all hover:bg-gray-600 hover:text-white"
                 >
                   <Lock className="h-4 w-4" />
-                  Ask Funds
-                </button>
-              ) : (
-                <button
-                  disabled
-                  title="Complete verification first"
-                  className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-gray-700 px-5 py-2.5 text-sm font-semibold text-gray-500 opacity-50"
-                >
-                  <Lock className="h-4 w-4" />
-                  Ask Funds
+                  <span className="hidden sm:inline">Ask Funds</span>
+                  <span className="text-xs">(Upgrade)</span>
                 </button>
               )}
+
               {isVerified() ? (
                 <button
                   onClick={() => router.push("/ngo/marketplace")}
@@ -601,6 +624,7 @@ export default function NgoDashboardPage() {
                   Marketplace
                 </button>
               )}
+
               <button
                 onClick={() => router.push("/")}
                 className="rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
@@ -647,7 +671,18 @@ export default function NgoDashboardPage() {
                 )}
 
                 {/* ✅ Request Funding Button - Mobile */}
-                {isVerified() && currentTier >= 3 ? (
+                {!isVerified() ? (
+                  // NOT VERIFIED - Disabled
+                  <button
+                    disabled
+                    title="Complete verification first to access funding requests"
+                    className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-gray-700 px-4 py-3 text-center text-sm font-semibold text-gray-500 opacity-50"
+                  >
+                    <Lock className="h-4 w-4" />
+                    Ask Funds (Verify First)
+                  </button>
+                ) : currentTier >= 3 ? (
+                  // VERIFIED + SILVER/GOLD - Active
                   <button
                     onClick={() => {
                       router.push("/ngo/request-funding");
@@ -658,26 +693,18 @@ export default function NgoDashboardPage() {
                     <DollarSign className="h-4 w-4" />
                     Ask Funds
                   </button>
-                ) : currentTier < 3 && isVerified() ? (
+                ) : (
+                  // VERIFIED but FREE/BRONZE - Locked, upgrade prompt
                   <button
                     onClick={() => {
                       router.push("/ngo/subscription/plans");
                       setIsMobileMenuOpen(false);
                     }}
-                    title="Upgrade to Silver or Gold to ask for funds"
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-700 px-4 py-3 text-center text-sm font-semibold text-gray-400 transition-colors hover:bg-gray-600"
+                    title="Upgrade to Silver or Gold to request funding"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-700 px-4 py-3 text-center text-sm font-semibold text-gray-400 transition-colors hover:bg-gray-600 hover:text-white"
                   >
                     <Lock className="h-4 w-4" />
-                    Ask Funds
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    title="Complete verification first"
-                    className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-gray-700 px-4 py-3 text-center text-sm font-semibold text-gray-500 opacity-50"
-                  >
-                    <Lock className="h-4 w-4" />
-                    Ask Funds
+                    Ask Funds - Upgrade Required
                   </button>
                 )}
 
@@ -702,6 +729,7 @@ export default function NgoDashboardPage() {
                     Marketplace
                   </button>
                 )}
+
                 <button
                   onClick={() => {
                     router.push("/");
@@ -878,10 +906,18 @@ export default function NgoDashboardPage() {
               <div>
                 <p className="mb-2 text-sm text-gray-400">Total Received</p>
                 <h3 className="text-3xl font-bold text-white">
-                  ₹ {totalReceived.toLocaleString()}
+                  ₹ {financialDonations.toLocaleString()}
                 </h3>
                 <p className="mt-1 text-xs text-gray-500">
-                  {itemsReceived} item donation{itemsReceived !== 1 ? "s" : ""}
+                  {
+                    fundingRequests.filter((r) => r.adminStatus === "approved")
+                      .length
+                  }{" "}
+                  approved request
+                  {fundingRequests.filter((r) => r.adminStatus === "approved")
+                    .length !== 1
+                    ? "s"
+                    : ""}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/10">
