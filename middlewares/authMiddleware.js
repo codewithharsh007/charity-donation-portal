@@ -1,8 +1,8 @@
 // middlewares/authMiddleware.js
 import { cookies } from 'next/headers';
-import User from '@/models/authModel'; // Use absolute path
+import User from '@/models/authModel';
 import { verifyToken } from '@/config/JWT';
-import dbConnect from '@/lib/mongodb'; // Add this
+import dbConnect from '@/lib/mongodb';
 
 /**
  * protect - authentication middleware for Next.js API routes
@@ -12,7 +12,6 @@ import dbConnect from '@/lib/mongodb'; // Add this
  */
 export const protect = async (request) => {
   try {
-    
     // Get token from cookies or Authorization header
     const cookieStore = await cookies();
     const tokenFromCookie = cookieStore.get('token')?.value;
@@ -32,7 +31,7 @@ export const protect = async (request) => {
       };
     }
 
-    // Verify token (handle verify errors gracefully)
+    // Verify token
     let decoded;
     try {
       decoded = verifyToken(token);
@@ -45,11 +44,12 @@ export const protect = async (request) => {
       };
     }
 
-    // Connect to database before querying
+    // Connect to database
     await dbConnect();
 
-    // Find user
-    const user = await User.findById(decoded.id).select('-password');
+    // Find user (handle both decoded.id and decoded.userId)
+    const userId = decoded.id || decoded.userId || decoded._id;
+    const user = await User.findById(userId).select('-password').lean();
     
     if (!user) {
       return {
@@ -59,11 +59,13 @@ export const protect = async (request) => {
       };
     }
 
+    // Return success with user data
     return {
       success: true,
       user: {
-        ...user.toObject(),
-        userId: user._id, // Add userId here for convenience
+        ...user,
+        userId: user._id,
+        id: user._id, // Add both for compatibility
       },
       userId: user._id,
       status: 200
@@ -94,7 +96,7 @@ export const authorize = async (request, allowedRoles = []) => {
     if (!allowedRoles.includes(authResult.user.role)) {
       return { 
         success: false, 
-        message: 'Forbidden - Insufficient permissions', 
+        message: `Forbidden - Requires role: ${allowedRoles.join(' or ')}`, 
         status: 403 
       };
     }
@@ -108,6 +110,30 @@ export const authorize = async (request, allowedRoles = []) => {
       status: 500 
     };
   }
+};
+
+/**
+ * Helper function to use in API routes
+ * Returns NextResponse if auth fails, otherwise returns user data
+ */
+export const authenticateRequest = async (request) => {
+  const authResult = await protect(request);
+  
+  if (!authResult.success) {
+    return {
+      error: true,
+      response: NextResponse.json(
+        { success: false, message: authResult.message },
+        { status: authResult.status }
+      )
+    };
+  }
+  
+  return {
+    error: false,
+    user: authResult.user,
+    userId: authResult.userId
+  };
 };
 
 export default protect;

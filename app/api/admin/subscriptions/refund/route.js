@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyToken } from '@/middlewares/authMiddleware';
+import { protect } from '@/middlewares/authMiddleware';
 import dbConnect from '@/lib/mongodb';
 import SubscriptionTransaction from '@/models/subscriptionTransactionModel';
 import User from '@/models/authModel';
@@ -11,7 +11,7 @@ export async function POST(req) {
     await dbConnect();
     
     // Verify authentication and admin role
-    const authResult = await verifyToken(req);
+    const authResult = await protect(req);
     if (!authResult.success) {
       return NextResponse.json(
         { message: 'Unauthorized' },

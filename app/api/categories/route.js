@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyToken } from '@/middlewares/authMiddleware';
+import { protect } from '@/middlewares/authMiddleware';
 import { getAllCategories, getCategoriesByTier } from '@/controllers/categoryController';
 import dbConnect from '@/lib/mongodb';
 
@@ -13,7 +13,7 @@ export async function GET(req) {
     
     // If requesting accessible categories, verify auth
     if (filter === 'accessible') {
-      const authResult = await verifyToken(req);
+      const authResult = await protect(req);
       if (!authResult.success) {
         return NextResponse.json(
           { message: 'Unauthorized' },

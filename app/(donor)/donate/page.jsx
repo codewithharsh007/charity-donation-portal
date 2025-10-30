@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Heart, Home, LayoutDashboard } from "lucide-react";
 import LoginPromptModal from "@/components/LoginPromptModal";
@@ -22,11 +22,12 @@ const convertFileToBase64 = (file) => {
   });
 };
 
-export default function DonatePage() {
+// Separate component that uses useSearchParams
+function DonatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("financial");
-  const [viewMode, setViewMode] = useState("create"); // 'create' or 'history'
+  const [viewMode, setViewMode] = useState("create");
   const [user, setUser] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -53,7 +54,7 @@ export default function DonatePage() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    // Check if user is logged in - if not, show login modal
+    // Check if user is logged in
     const userData = localStorage.getItem("user");
     if (!userData) {
       setShowLoginModal(true);
@@ -71,7 +72,6 @@ export default function DonatePage() {
 
   const fetchDonations = async () => {
     try {
-      // Fetch both financial and item donations
       const [financialRes, itemsRes] = await Promise.all([
         fetch("/api/donations/financial"),
         fetch("/api/donations/items?type=donor"),
@@ -97,7 +97,6 @@ export default function DonatePage() {
         throw new Error("No file provided");
       }
 
-      // Check file size
       const isVideo = file.type.startsWith("video/");
       const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
 
@@ -107,14 +106,12 @@ export default function DonatePage() {
         throw new Error(`File is ${sizeMB}MB, exceeds ${maxSizeMB}MB limit`);
       }
 
-      // Convert to base64
       const base64Data = await convertFileToBase64(file);
 
       if (!base64Data || !base64Data.startsWith("data:")) {
         throw new Error("Failed to convert file");
       }
 
-      // Upload
       const response = await fetch("/api/cloudinary/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,7 +137,6 @@ export default function DonatePage() {
   const handleFinancialDonation = async (e) => {
     e.preventDefault();
 
-    // Check if user is logged in - check localStorage for user data
     const userData = localStorage.getItem("user");
 
     if (!userData) {
@@ -173,7 +169,6 @@ export default function DonatePage() {
         throw new Error(data.message || "Donation failed");
       }
 
-      // Redirect to thank you page with donation details
       router.push(`/thank-you?type=financial&amount=${financialAmount}`);
     } catch (err) {
       setError(err.message);
@@ -185,7 +180,6 @@ export default function DonatePage() {
   const handleItemDonation = async (e) => {
     e.preventDefault();
 
-    // Check if user is logged in
     const userData = localStorage.getItem("user");
 
     if (!userData) {
@@ -198,7 +192,6 @@ export default function DonatePage() {
     setSuccess("");
 
     try {
-      // Validation
       if (!itemCategory) {
         throw new Error("Please select a category");
       }
@@ -219,7 +212,6 @@ export default function DonatePage() {
         throw new Error("Please provide pickup address");
       }
 
-      // Validate file objects
       const invalidImages = imageFiles.filter((f) => !(f instanceof File));
       if (invalidImages.length > 0) {
         throw new Error("Some images are invalid. Please re-upload them.");
@@ -230,7 +222,6 @@ export default function DonatePage() {
         throw new Error("Some videos are invalid. Please re-upload them.");
       }
 
-      // Upload images
       setError(`Uploading images... (0/${imageFiles.length})`);
       const uploadedImages = [];
 
@@ -249,10 +240,9 @@ export default function DonatePage() {
         }
       }
 
-      // Upload videos
       setError(`Uploading videos... (0/${videoFiles.length})`);
       const uploadedVideos = [];
-      const startTime = Date.now(); // ✅ Track total time
+      const startTime = Date.now();
 
       for (let i = 0; i < videoFiles.length; i++) {
         try {
@@ -262,7 +252,7 @@ export default function DonatePage() {
               `(${sizeMB}MB - This may take 2-5 minutes, please wait)`,
           );
 
-          const videoStartTime = Date.now(); // Track individual video time
+          const videoStartTime = Date.now();
           const result = await uploadToCloudinary(videoFiles[i]);
           const uploadSeconds = Math.round(
             (Date.now() - videoStartTime) / 1000,
@@ -272,7 +262,6 @@ export default function DonatePage() {
             url: result.secure_url,
             publicId: result.public_id,
           });
-
         } catch (err) {
           console.error(`❌ Video ${i + 1} failed:`, err);
           setError("");
@@ -285,15 +274,12 @@ export default function DonatePage() {
               `Please try again or use a smaller/compressed video.`,
           );
 
-          return; // Stop the form submission
+          return;
         }
       }
 
-      // Show success message after all videos uploaded
       const totalSeconds = Math.round((Date.now() - startTime) / 1000);
-     
 
-      // Submit donation
       setError("Submitting donation...");
 
       const res = await fetch("/api/donations/items", {
@@ -315,29 +301,23 @@ export default function DonatePage() {
         throw new Error(data.message || "Donation submission failed");
       }
 
-      // ✅ CLEAR ALL FORM DATA AND FILE INPUTS
       setError("");
       setSuccess("Donation submitted successfully! Redirecting...");
 
-      // Clear form fields
       setItemCategory("");
       setItemsList([]);
       setItemDescription("");
       setPickupAddress("");
-
-      // Clear file states
       setImageFiles([]);
       setVideoFiles([]);
       setImagePreviews([]);
       setVideoPreviews([]);
 
-      // Clear the actual input elements
       const imageInput = document.getElementById("image-upload");
       const videoInput = document.getElementById("video-upload");
       if (imageInput) imageInput.value = "";
       if (videoInput) videoInput.value = "";
 
-      // Redirect after a short delay
       setTimeout(() => {
         router.push(
           `/thank-you?type=item&category=${encodeURIComponent(itemCategory)}&itemCount=${itemsList.length}`,
@@ -434,28 +414,8 @@ export default function DonatePage() {
     const adminStatus = statusMap[donation.adminStatus] || statusMap.pending;
     const deliveryStatus = deliveryMap[donation.deliveryStatus];
 
-    // Only show delivery status if approved and has been accepted by NGO
     const shouldShowDelivery =
       donation.adminStatus === "approved" && donation.acceptedBy;
-
-    {
-      /* Success/Error Messages */
-    }
-    {
-      success && (
-        <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4">
-          <p className="text-sm font-medium text-green-800">✅ {success}</p>
-        </div>
-      );
-    }
-
-    {
-      error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-800">❌ {error}</p>
-        </div>
-      );
-    }
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -551,6 +511,21 @@ export default function DonatePage() {
           </div>
 
           <div className="p-6">
+            {/* Success/Error Messages */}
+            {success && (
+              <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-medium text-green-800">
+                  ✅ {success}
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-medium text-red-800">❌ {error}</p>
+              </div>
+            )}
+
             {/* Create Donation View */}
             {viewMode === "create" && (
               <div className="mx-auto max-w-2xl">
@@ -597,7 +572,6 @@ export default function DonatePage() {
                 {/* Financial Donation Form */}
                 {activeTab === "financial" && (
                   <div>
-                    {/* Donation Type Selection Above */}
                     <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
                       <button
                         onClick={() => setActiveTab("financial")}
@@ -657,7 +631,7 @@ export default function DonatePage() {
                               onClick={() =>
                                 setFinancialAmount(amount.toString())
                               }
-                              className="rounded-lg border text-green-600 border-green-600 bg-white px-3 py-2 text-sm hover:border-green-700 hover:text-green-700"
+                              className="rounded-lg border border-green-600 bg-white px-3 py-2 text-sm text-green-600 hover:border-green-700 hover:text-green-700"
                             >
                               ₹{amount}
                             </button>
@@ -678,12 +652,6 @@ export default function DonatePage() {
                         />
                       </div>
 
-                      {error && (
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                          <p className="text-sm text-red-800">{error}</p>
-                        </div>
-                      )}
-
                       <button
                         type="submit"
                         disabled={loading}
@@ -698,7 +666,6 @@ export default function DonatePage() {
                 {/* Item Donation Form */}
                 {activeTab === "items" && (
                   <div>
-                    {/* Donation Type Selection Above */}
                     <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
                       <button
                         onClick={() => setActiveTab("financial")}
@@ -920,12 +887,6 @@ export default function DonatePage() {
                         )}
                       </div>
 
-                      {error && (
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                          <p className="text-sm text-red-800">{error}</p>
-                        </div>
-                      )}
-
                       <button
                         type="submit"
                         disabled={loading}
@@ -939,14 +900,13 @@ export default function DonatePage() {
               </div>
             )}
 
-            {/* History View - Combined Donations */}
+            {/* History View */}
             {viewMode === "history" && (
               <div>
                 <h2 className="mb-6 text-2xl font-bold text-gray-900">
                   Complete Donation History
                 </h2>
 
-                {/* Combined Donations List */}
                 <div className="space-y-4">
                   {[
                     ...financialDonations.map((d) => ({
@@ -1155,7 +1115,6 @@ export default function DonatePage() {
         </div>
       </div>
 
-      {/* Login Required Modal */}
       <LoginPromptModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
@@ -1163,5 +1122,23 @@ export default function DonatePage() {
         disableTimer={true}
       />
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function DonatePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <DonatePageContent />
+    </Suspense>
   );
 }
