@@ -362,7 +362,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/verified-ngos"
-                className="text-white transition-colors hover:text-red-500"
+                className="py-2 text-center text-white transition-colors hover:text-red-500"
               >
                 Verified NGOs
               </Link>

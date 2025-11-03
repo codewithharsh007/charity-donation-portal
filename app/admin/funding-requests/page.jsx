@@ -463,7 +463,7 @@ export default function AdminFundingRequestsPage() {
       {/* Detail Modal */}
       {showDetailModal && selectedRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-gray-700 bg-gray-900">
+          <div className="scrollbar-hide max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-gray-700 bg-gray-900">
             <div className="sticky top-0 z-10 border-b border-gray-700 bg-gray-800/95 px-6 py-4 backdrop-blur-sm">
               <div className="flex items-center justify-between">
                 <div>
@@ -508,7 +508,7 @@ export default function AdminFundingRequestsPage() {
                 <h3 className="mb-2 text-sm font-medium text-gray-400">
                   Description
                 </h3>
-                <p className="whitespace-pre-wrap text-gray-300">
+                <p className="overflow-hidden wrap-break-word whitespace-pre-wrap text-gray-300">
                   {selectedRequest.description}
                 </p>
               </div>

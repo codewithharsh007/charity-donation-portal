@@ -4,6 +4,7 @@ import NgoSubscription from "@/models/ngoSubscriptionModel";
 import SubscriptionTransaction from "@/models/subscriptionTransactionModel";
 import User from "@/models/authModel";
 import ItemCategory from "@/models/itemCategoryModel";
+import { isTestMode } from "@/lib/testMode";
 
 // Get all subscription plans
 export const getSubscriptionPlans = async () => {
@@ -42,7 +43,7 @@ export const getSubscriptionPlans = async () => {
     return {
       success: false,
       message: "Failed to fetch subscription plans",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -119,7 +120,7 @@ export const getCurrentSubscription = async (userId) => {
     return {
       success: false,
       message: "Failed to fetch subscription details",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -187,7 +188,7 @@ export const getSubscriptionUsage = async (userId) => {
     return {
       success: false,
       message: "Failed to fetch usage statistics",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -333,7 +334,7 @@ export const createSubscription = async (userId, data) => {
     return {
       success: false,
       message: "Failed to create subscription",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -401,7 +402,7 @@ export const cancelSubscription = async (userId, data = {}) => {
     return {
       success: false,
       message: "Failed to cancel subscription",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -473,7 +474,7 @@ export const downgradeToFree = async (userId) => {
     return {
       success: false,
       message: "Failed to downgrade subscription",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -533,7 +534,7 @@ export const checkUpgradeEligibility = async (userId, targetTier) => {
     return {
       success: false,
       message: "Failed to check eligibility",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -568,7 +569,7 @@ export const getTransactionHistory = async (userId, page = 1, limit = 10) => {
     return {
       success: false,
       message: "Failed to fetch transaction history",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }

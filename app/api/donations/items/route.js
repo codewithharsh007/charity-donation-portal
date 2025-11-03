@@ -1,12 +1,15 @@
-import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
-import { protect } from '@/middlewares/authMiddleware';
+import { NextResponse } from "next/server";
+import dbConnect from "@/lib/mongodb";
+import { protect } from "@/middlewares/authMiddleware";
+import { isTestMode } from "@/lib/testMode"; // ✅ ADD THIS
 import {
   createItemDonation,
   getDonorItemDonations,
   getAvailableItemsForNGOs,
   getNGOAcceptedDonations,
-} from '@/controllers/itemDonationController';
+} from "@/controllers/itemDonationController";
+
+export const runtime = "nodejs"; // ✅ ADD THIS
 
 // POST - Create item donation
 export async function POST(request) {
@@ -15,7 +18,10 @@ export async function POST(request) {
 
     const auth = await protect(request);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: auth.status });
+      return NextResponse.json(
+        { message: auth.message },
+        { status: auth.status },
+      );
     }
 
     const donationData = await request.json();
@@ -27,13 +33,19 @@ export async function POST(request) {
         message: result.message,
         donation: result.donation,
       },
-      { status: result.status }
+      { status: result.status },
     );
   } catch (error) {
-    console.error('❌ POST /api/donations/items error:', error);
+    console.error("❌ POST /api/donations/items error:", error);
+    // ✅ CHANGED: Use isTestMode()
     return NextResponse.json(
-      { success: false, message: 'Server error', error: error.message },
-      { status: 500 }
+      {
+        success: false,
+        message: "Server error",
+        error: isTestMode() ? error.message : undefined,
+        stack: isTestMode() ? error.stack : undefined,
+      },
+      { status: 500 },
     );
   }
 }
@@ -45,20 +57,22 @@ export async function GET(request) {
 
     const auth = await protect(request);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: auth.status });
+      return NextResponse.json(
+        { message: auth.message },
+        { status: auth.status },
+      );
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const filter = searchParams.get('filter');
-
+    const type = searchParams.get("type");
+    const filter = searchParams.get("filter");
 
     let result;
-    
-    if (type === 'ngo') {
-      if (filter === 'available') {
+
+    if (type === "ngo") {
+      if (filter === "available") {
         result = await getAvailableItemsForNGOs(auth.userId);
-      } else if (filter === 'accepted') {
+      } else if (filter === "accepted") {
         result = await getNGOAcceptedDonations(auth.userId);
       } else {
         result = await getAvailableItemsForNGOs(auth.userId);
@@ -73,13 +87,19 @@ export async function GET(request) {
         donations: result.donations,
         count: result.count,
       },
-      { status: result.status }
+      { status: result.status },
     );
   } catch (error) {
-    console.error('❌ GET /api/donations/items error:', error);
+    console.error("❌ GET /api/donations/items error:", error);
+    // ✅ CHANGED: Use isTestMode()
     return NextResponse.json(
-      { success: false, message: 'Server error', error: error.message },
-      { status: 500 }
+      {
+        success: false,
+        message: "Server error",
+        error: isTestMode() ? error.message : undefined,
+        stack: isTestMode() ? error.stack : undefined,
+      },
+      { status: 500 },
     );
   }
 }

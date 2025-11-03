@@ -1,7 +1,7 @@
-// app/ngoDashboard/subscription/page.jsx
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 export default function SubscriptionDashboard() {
   const router = useRouter();
@@ -9,6 +9,16 @@ export default function SubscriptionDashboard() {
   const [subscriptionData, setSubscriptionData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState('');
+
+  // ✅ NEW: Modal States
+  const [modal, setModal] = useState({
+    show: false,
+    type: 'confirm', // 'confirm' or 'alert'
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    onCancel: () => {},
+  });
 
   useEffect(() => {
     fetchSubscriptionData();
@@ -18,17 +28,15 @@ export default function SubscriptionDashboard() {
     try {
       setLoading(true);
       
-      // Fetch current subscription
       const subRes = await fetch('/api/subscriptions/current', {
         credentials: 'include'
       });
       
       if (subRes.ok) {
         const subData = await subRes.json();
-        setSubscriptionData(subData.data); // ✅ Use subData.data
+        setSubscriptionData(subData.data);
       }
 
-      // Fetch transaction history
       const txRes = await fetch('/api/subscriptions/transactions', {
         credentials: 'include'
       });
@@ -49,27 +57,54 @@ export default function SubscriptionDashboard() {
     router.push('/ngo/subscription/plans');
   };
 
+  // ✅ NEW: Show Confirm Modal
+  const showConfirmModal = (title, message, onConfirm) => {
+    setModal({
+      show: true,
+      type: 'confirm',
+      title,
+      message,
+      onConfirm,
+      onCancel: () => setModal({ ...modal, show: false }),
+    });
+  };
+
+  // ✅ NEW: Show Alert Modal
+  const showAlertModal = (title, message) => {
+    setModal({
+      show: true,
+      type: 'alert',
+      title,
+      message,
+      onConfirm: () => setModal({ ...modal, show: false }),
+      onCancel: () => {},
+    });
+  };
+
   const handleCancelSubscription = async () => {
-    if (!confirm('Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.')) {
-      return;
-    }
+    showConfirmModal(
+      'Cancel Subscription?',
+      'Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.',
+      async () => {
+        try {
+          const res = await fetch('/api/subscriptions/cancel', {
+            method: 'POST',
+            credentials: 'include'
+          });
 
-    try {
-      const res = await fetch('/api/subscriptions/cancel', {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (res.ok) {
-        alert('Subscription cancelled successfully');
-        fetchSubscriptionData();
-      } else {
-        const data = await res.json();
-        alert(data.message || 'Failed to cancel subscription');
+          if (res.ok) {
+            setModal({ ...modal, show: false });
+            showAlertModal('Success', 'Subscription cancelled successfully');
+            setTimeout(() => fetchSubscriptionData(), 1000);
+          } else {
+            const data = await res.json();
+            showAlertModal('Error', data.message || 'Failed to cancel subscription');
+          }
+        } catch (err) {
+          showAlertModal('Error', 'Error cancelling subscription');
+        }
       }
-    } catch (err) {
-      alert('Error cancelling subscription');
-    }
+    );
   };
 
   const getTierBadge = (tier) => {
@@ -128,6 +163,8 @@ export default function SubscriptionDashboard() {
             </button>
           </div>
         </div>
+        {/* Modal */}
+        <CustomModal modal={modal} />
       </div>
     );
   }
@@ -207,10 +244,9 @@ export default function SubscriptionDashboard() {
           </div>
         </div>
 
-        {/* Usage Statistics - Only show for paid tiers */}
+        {/* Usage Statistics */}
         {currentTier > 1 && plan.limits && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {/* Active Requests */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Active Requests</h3>
@@ -226,7 +262,6 @@ export default function SubscriptionDashboard() {
               <p className="text-sm text-gray-500 mt-2">Maximum concurrent requests</p>
             </div>
 
-            {/* Monthly Items */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Monthly Items</h3>
@@ -242,7 +277,6 @@ export default function SubscriptionDashboard() {
               <p className="text-sm text-gray-500 mt-2">Items per month</p>
             </div>
 
-            {/* Max Item Value */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Max Item Value</h3>
@@ -359,6 +393,66 @@ export default function SubscriptionDashboard() {
             className="text-gray-600 hover:text-gray-800 text-sm font-medium"
           >
             ← Back to Dashboard
+          </button>
+        </div>
+      </div>
+
+      {/* ✅ Custom Modal */}
+      <CustomModal modal={modal} />
+    </div>
+  );
+}
+
+// ✅ NEW: Custom Modal Component
+function CustomModal({ modal }) {
+  if (!modal.show) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4 animate-fade-in">
+      <div className="w-full max-w-sm rounded-2xl border border-gray-300 bg-white p-6 shadow-2xl animate-scale-in">
+        {/* Icon */}
+        <div className="mb-4 flex items-center justify-center">
+          {modal.type === 'alert' && (
+            <div className="rounded-full bg-blue-500/20 p-4">
+              <AlertCircle className="h-8 w-8 text-blue-500" />
+            </div>
+          )}
+          {modal.type === 'confirm' && (
+            <div className="rounded-full bg-yellow-500/20 p-4">
+              <AlertCircle className="h-8 w-8 text-yellow-500" />
+            </div>
+          )}
+        </div>
+
+        {/* Title */}
+        <h3 className="mb-2 text-center text-xl font-bold text-gray-800">
+          {modal.title}
+        </h3>
+
+        {/* Message */}
+        <p className="mb-6 break-words text-center text-gray-600">
+          {modal.message}
+        </p>
+
+        {/* Buttons */}
+        <div className={`flex gap-3 ${modal.type === 'confirm' ? 'justify-between' : 'justify-center'}`}>
+          {modal.type === 'confirm' && (
+            <button
+              onClick={modal.onCancel}
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={modal.onConfirm}
+            className={`${modal.type === 'confirm' ? 'flex-1' : 'w-full'} rounded-lg px-4 py-2 font-semibold text-white transition-colors ${
+              modal.type === 'confirm'
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {modal.type === 'confirm' ? 'Yes, Cancel' : 'OK'}
           </button>
         </div>
       </div>

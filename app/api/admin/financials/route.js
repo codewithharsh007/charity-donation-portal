@@ -4,7 +4,8 @@ import { verifyToken } from '@/config/JWT';
 import dbConnect from '@/lib/mongodb';
 import SubscriptionTransaction from '@/models/subscriptionTransactionModel';
 import FinancialDonation from '@/models/financialDonationModel';
-import FinancialRequest from '@/models/financialRequest'; // ✅ ADD THIS
+import FinancialRequest from '@/models/financialRequest'; 
+import { isTestMode } from "@/lib/testMode";
 import User from '@/models/authModel';
 
 export const runtime = 'nodejs';
@@ -61,7 +62,7 @@ export async function GET(req) {
 
     const donationTotal = completedDonations.reduce((sum, d) => sum + (d.amount || 0), 0);
 
-    // ===== APPROVED FUNDING REQUESTS (EXPENSES) ===== ✅ NEW
+    // ===== APPROVED FUNDING REQUESTS (EXPENSES) =====
     const approvedFundingRequests = await FinancialRequest.find({
       adminStatus: 'approved'
     }).lean();
@@ -89,7 +90,7 @@ export async function GET(req) {
       sum + (tx.invoice?.total || tx.amount || 0), 0
     );
 
-    // ✅ Monthly funding requests
+    // Monthly funding requests
     const monthlyFundingRequests = approvedFundingRequests.filter(fr =>
       new Date(fr.adminReviewedAt) >= startOfMonth
     );
@@ -173,7 +174,7 @@ export async function GET(req) {
         monthlyTrend[key].donationCount += 1;
       });
 
-    // ✅ Add funding expenses
+    // Add funding expenses
     approvedFundingRequests
       .filter(fr => new Date(fr.adminReviewedAt) >= sixMonthsAgo)
       .forEach(fr => {
@@ -232,7 +233,7 @@ export async function GET(req) {
           count: completedDonations.length,
           monthlyCount: monthlyDonations.length,
         },
-        fundingRequests: { // ✅ NEW
+        fundingRequests: {
           allTime: fundingRequestsTotal,
           thisMonth: monthlyFundingTotal,
           count: approvedFundingRequests.length,
@@ -250,11 +251,12 @@ export async function GET(req) {
     });
   } catch (error) {
     console.error('❌ Error fetching financials:', error);
+    console.error('Stack:', error.stack); // ✅ Add stack trace for debugging
     return NextResponse.json(
       { 
         success: false, 
         message: 'Server error', 
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: isTestMode() ? error.message : undefined
       },
       { status: 500 }
     );

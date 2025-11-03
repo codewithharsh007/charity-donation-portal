@@ -5,6 +5,7 @@ import { verifyToken } from "@/config/JWT";
 import dbConnect from "@/lib/mongodb";
 import NgoSubscription from "@/models/ngoSubscriptionModel";
 import SubscriptionPlan from "@/models/subscriptionPlanModel";
+import { isTestMode } from "@/lib/testMode";
 import SubscriptionTransaction from "@/models/subscriptionTransactionModel";
 import User from "@/models/authModel";
 
@@ -126,7 +127,7 @@ export async function GET(req) {
         success: false,
         message: "Server error",
         error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
+          isTestMode() ? error.message : undefined,
       },
       { status: 500 },
     );

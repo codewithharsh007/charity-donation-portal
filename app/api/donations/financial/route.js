@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { protect } from '@/middlewares/authMiddleware';
+import { isTestMode } from "@/lib/testMode"; // ✅ ADD THIS
 import {
   createFinancialDonation,
   getDonorFinancialDonations,
   getAllFinancialDonations,
 } from '@/controllers/financialDonationController';
+
+export const runtime = 'nodejs'; // ✅ ADD THIS
 
 // POST - Create financial donation
 export async function POST(request) {
@@ -31,8 +34,14 @@ export async function POST(request) {
     );
   } catch (error) {
     console.error('Create financial donation error:', error);
+    // ✅ CHANGED: Use isTestMode() and add stack trace
     return NextResponse.json(
-      { success: false, message: 'Server error', error: error.message },
+      { 
+        success: false, 
+        message: 'Server error', 
+        error: isTestMode() ? error.message : undefined,
+        stack: isTestMode() ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }
@@ -71,8 +80,14 @@ export async function GET(request) {
     );
   } catch (error) {
     console.error('Get financial donations error:', error);
+    // ✅ CHANGED: Use isTestMode() and add stack trace
     return NextResponse.json(
-      { success: false, message: 'Server error', error: error.message },
+      { 
+        success: false, 
+        message: 'Server error', 
+        error: isTestMode() ? error.message : undefined,
+        stack: isTestMode() ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }

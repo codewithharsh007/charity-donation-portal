@@ -2,9 +2,8 @@ import bcrypt from "bcryptjs";
 import User from "../models/authModel";
 import sendorgEmail from "../utils/emailService";
 import { signToken } from "../config/JWT";
+import { isTestMode } from "@/lib/testMode"; // ✅ Add this import
 
-// In-memory OTP store (persists across hot reloads in development)
-// Using global to prevent reinitialization during Next.js hot reload
 const globalForOtp = global;
 if (!globalForOtp.otpStore) {
   globalForOtp.otpStore = new Map();
@@ -34,9 +33,14 @@ export const sendOtp = async (email) => {
     // Send OTP email (helper may return devOtp in development)
     const sendResult = await sendorgEmail(email, "Your OTP Code", otp);
 
-    // If helper returned a devOtp (when EMAIL_* missing), include it in response only in non-production
-    if (sendResult && sendResult.devOtp && process.env.NODE_ENV !== 'production') {
-      return { success: true, message: "OTP sent to email (dev)", status: 200, otp: sendResult.devOtp };
+    // ✅ Changed: Use isTestMode() instead of NODE_ENV check
+    if (sendResult && sendResult.devOtp && isTestMode()) {
+      return {
+        success: true,
+        message: "OTP sent to email (dev)",
+        status: 200,
+        otp: sendResult.devOtp,
+      };
     }
 
     return { success: true, message: "OTP sent to email", status: 200 };
@@ -76,7 +80,6 @@ export const verifyOtp = (email, otp) => {
     const storedOtp = String(record.otp).trim();
     const inputOtp = String(otp).trim();
 
-
     if (storedOtp !== inputOtp) {
       return { success: false, message: "Invalid OTP", status: 400 };
     }
@@ -98,7 +101,6 @@ export const verifyOtp = (email, otp) => {
 // Step 3: Complete registration
 export const register = async (userData) => {
   try {
-  
     const {
       email,
       userName,
@@ -112,8 +114,6 @@ export const register = async (userData) => {
       pincode,
     } = userData;
 
-   
-
     // Validate lastName
     if (!lastName || lastName.trim() === "") {
       return {
@@ -125,7 +125,7 @@ export const register = async (userData) => {
     }
 
     // Validate userType
-    if (!userType || !['donor', 'ngo'].includes(userType)) {
+    if (!userType || !["donor", "ngo"].includes(userType)) {
       return {
         success: false,
         message: 'User type is required and must be either "donor" or "ngo"',
@@ -136,24 +136,20 @@ export const register = async (userData) => {
     // Check OTP verification
     const record = otpStore.get(email);
 
-
     if (!record || !record.verified) {
       return { success: false, message: "Email not verified", status: 400 };
     }
 
     // Check if user already exists
-  
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return { success: false, message: "User already exists", status: 400 };
     }
 
     // Hash password
-  
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
-  
     const user = new User({
       userName,
       lastName,
@@ -167,7 +163,7 @@ export const register = async (userData) => {
       pincode,
       role: userType, // Set role same as userType for now
     });
-   
+
     await user.save();
 
     otpStore.delete(email); // Clean up OTP store
@@ -183,7 +179,7 @@ export const register = async (userData) => {
     return {
       success: false,
       message: "Server error",
-      error: err.message,
+      error: isTestMode() ? err.message : undefined, // ✅ Changed
       status: 500,
     };
   }
@@ -207,7 +203,9 @@ export const login = async (email, password) => {
     // Check if NGO is verified (only for NGO users)
     let isVerified = false;
     if (user.userType === "ngo") {
-      const NgoVerification = (await import("../models/ngoVerificationModel.js")).default;
+      const NgoVerification = (
+        await import("../models/ngoVerificationModel.js")
+      ).default;
       const verification = await NgoVerification.findOne({ userId: user._id });
       isVerified = verification?.verificationStatus === "accepted";
     }
@@ -239,7 +237,7 @@ export const login = async (email, password) => {
     return {
       success: false,
       message: "Server error",
-      error: err.message,
+      error: isTestMode() ? err.message : undefined, // ✅ Changed
       status: 500,
     };
   }

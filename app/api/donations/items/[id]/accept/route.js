@@ -1,7 +1,10 @@
-import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
-import { protect } from '@/middlewares/authMiddleware';
-import { acceptItemDonation } from '@/controllers/itemDonationController';
+import { NextResponse } from "next/server";
+import dbConnect from "@/lib/mongodb";
+import { protect } from "@/middlewares/authMiddleware";
+import { isTestMode } from "@/lib/testMode"; // ✅ ADD THIS
+import { acceptItemDonation } from "@/controllers/itemDonationController";
+
+export const runtime = "nodejs"; // ✅ ADD THIS
 
 export async function POST(request, { params }) {
   try {
@@ -9,10 +12,13 @@ export async function POST(request, { params }) {
 
     const auth = await protect(request);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: auth.status });
+      return NextResponse.json(
+        { message: auth.message },
+        { status: auth.status },
+      );
     }
 
-    // ✅ FIX: Await params in Next.js 15
+    // ✅ Await params in Next.js 15
     const { id } = await params;
 
     const result = await acceptItemDonation(id, auth.userId);
@@ -23,13 +29,19 @@ export async function POST(request, { params }) {
         message: result.message,
         donation: result.donation,
       },
-      { status: result.status }
+      { status: result.status },
     );
   } catch (error) {
-    console.error('Accept item donation error:', error);
+    console.error("Accept item donation error:", error);
+    // ✅ CHANGED: Use isTestMode()
     return NextResponse.json(
-      { success: false, message: 'Server error', error: error.message },
-      { status: 500 }
+      {
+        success: false,
+        message: "Server error",
+        error: isTestMode() ? error.message : undefined,
+        stack: isTestMode() ? error.stack : undefined,
+      },
+      { status: 500 },
     );
   }
 }

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { protect } from '@/middlewares/authMiddleware';
 import { createPaymentOrder } from '@/controllers/paymentController';
 import dbConnect from '@/lib/mongodb';
+import { isTestMode } from "@/lib/testMode";
 
 export const runtime = 'nodejs';
 
@@ -99,7 +100,7 @@ export async function POST(req) {
       { 
         success: false, 
         message: 'Internal server error', 
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        error: isTestMode() ? error.message : undefined,
         errorType: error.name
       },
       { status: 500 }

@@ -5,13 +5,11 @@ import SubscriptionTransaction from "@/models/subscriptionTransactionModel";
 import NgoSubscription from "@/models/ngoSubscriptionModel";
 import SubscriptionPlan from "@/models/subscriptionPlanModel";
 import User from "@/models/authModel";
-
-// Check if in test mode
-const isTestMode = process.env.SUBSCRIPTION_TEST_MODE === "true";
+import { isTestMode } from "@/lib/testMode";
 
 // Initialize Razorpay instance (only if not in test mode)
 let razorpay;
-if (!isTestMode) {
+if (!isTestMode()) {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
@@ -21,7 +19,9 @@ if (!isTestMode) {
       key_secret: keySecret,
     });
   } else {
-    console.warn('⚠️ Razorpay credentials missing. Set SUBSCRIPTION_TEST_MODE=true for testing.');
+    console.warn(
+      "⚠️ Razorpay credentials missing. Set SUBSCRIPTION_TEST_MODE=true for testing.",
+    );
   }
 } else {
 }
@@ -29,7 +29,6 @@ if (!isTestMode) {
 // Create Payment Order (for subscription payment)
 export const createPaymentOrder = async (userId, data) => {
   try {
-
     const { planId, billingCycle } = data;
 
     // Validate input
@@ -79,13 +78,14 @@ export const createPaymentOrder = async (userId, data) => {
     }
 
     // Calculate amount
-    const amount = billingCycle === "monthly" ? plan.pricing.monthly : plan.pricing.yearly;
+    const amount =
+      billingCycle === "monthly" ? plan.pricing.monthly : plan.pricing.yearly;
     const gstAmount = amount * 0.18;
     const totalAmount = amount + gstAmount;
 
     // Create Razorpay order
     let razorpayOrder;
-    if (isTestMode) {
+    if (isTestMode()) {
       razorpayOrder = {
         id: `order_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         entity: "order",
@@ -98,11 +98,12 @@ export const createPaymentOrder = async (userId, data) => {
       if (!razorpay || typeof razorpay.orders === "undefined") {
         return {
           success: false,
-          message: "Payment gateway not configured. Please contact administrator.",
+          message:
+            "Payment gateway not configured. Please contact administrator.",
           status: 500,
         };
       }
-      
+
       const options = {
         amount: Math.round(totalAmount * 100),
         currency: "INR",
@@ -157,9 +158,9 @@ export const createPaymentOrder = async (userId, data) => {
       orderId: razorpayOrder.id,
       amount: totalAmount,
       currency: "INR",
-      keyId: isTestMode ? "test_mode" : process.env.RAZORPAY_KEY_ID,
+      keyId: isTestMode() ? "test_mode" : process.env.RAZORPAY_KEY_ID,
       transactionId: transaction._id.toString(),
-      testMode: isTestMode,
+      testMode: isTestMode(),
       breakdown: {
         subtotal: amount,
         gst: gstAmount,
@@ -178,7 +179,7 @@ export const createPaymentOrder = async (userId, data) => {
     return {
       success: false,
       message: "Failed to create payment order",
-      error: process.env.NODE_ENV === "development" ? error.message : "Internal server error",
+      error: isTestMode() ? error.message : "Internal server error",
       status: 500,
     };
   }
@@ -194,7 +195,12 @@ export const verifyPayment = async (userId, paymentData) => {
       transactionId,
     } = paymentData;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !transactionId) {
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature ||
+      !transactionId
+    ) {
       return {
         success: false,
         message: "Missing required payment details",
@@ -203,7 +209,7 @@ export const verifyPayment = async (userId, paymentData) => {
     }
 
     // Verify signature (skip in test mode)
-    if (!isTestMode) {
+    if (!isTestMode()) {
       const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
       if (!keySecret) {
@@ -301,7 +307,9 @@ export const verifyPayment = async (userId, paymentData) => {
     // Check if upgrading existing subscription
     let subscription;
     if (user.subscription?.subscriptionId) {
-      subscription = await NgoSubscription.findById(user.subscription.subscriptionId);
+      subscription = await NgoSubscription.findById(
+        user.subscription.subscriptionId,
+      );
 
       if (subscription) {
         // Update existing subscription
@@ -368,7 +376,7 @@ export const verifyPayment = async (userId, paymentData) => {
     return {
       success: false,
       message: "Failed to verify payment",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -422,7 +430,7 @@ export const handlePaymentFailure = async (userId, failureData) => {
     return {
       success: false,
       message: "Failed to record payment failure",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -431,7 +439,7 @@ export const handlePaymentFailure = async (userId, failureData) => {
 // Test mode payment completion (generates test payment credentials)
 export const getTestPaymentCredentials = async (transactionId) => {
   try {
-    if (!isTestMode) {
+    if (!isTestMode()) {
       return {
         success: false,
         message: "Test payment endpoint only available in test mode",
@@ -477,7 +485,7 @@ export const getTestPaymentCredentials = async (transactionId) => {
     return {
       success: false,
       message: "Test payment failed",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }
@@ -520,7 +528,7 @@ export const handleWebhook = async (webhookData, signature) => {
     return {
       success: false,
       message: "Webhook processing failed",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: isTestMode() ? error.message : undefined,
       status: 500,
     };
   }

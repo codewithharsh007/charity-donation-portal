@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/config/JWT';
 import dbConnect from '@/lib/mongodb';
+import { isTestMode } from "@/lib/testMode";
 import User from '@/models/authModel';
 
 export const runtime = 'nodejs';
@@ -94,7 +95,7 @@ export async function GET(req) {
       { 
         success: false, 
         message: 'Server error',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: isTestMode() ? error.message : undefined
       },
       { status: 500 }
     );

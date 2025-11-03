@@ -1,26 +1,27 @@
 // app/api/admin/expenses/route.js
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/config/JWT';
-import dbConnect from '@/lib/mongodb';
-import Expense from '@/models/expenseModel';
-import User from '@/models/authModel';
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { verifyToken } from "@/config/JWT";
+import dbConnect from "@/lib/mongodb";
+import { isTestMode } from "@/lib/testMode";
+import Expense from "@/models/expenseModel";
+import User from "@/models/authModel";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
 // GET - Get all expenses (Admin only)
 export async function GET(req) {
   try {
     await dbConnect();
-    
+
     // Get token from cookies
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    
+    const token = cookieStore.get("token")?.value;
+
     if (!token) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
 
@@ -28,43 +29,40 @@ export async function GET(req) {
     const decoded = verifyToken(token);
     if (!decoded) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
-
 
     // Check if user is admin
     const user = await User.findById(decoded.id);
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== "admin") {
       return NextResponse.json(
-        { success: false, message: 'Access denied. Admin only.' },
-        { status: 403 }
+        { success: false, message: "Access denied. Admin only." },
+        { status: 403 },
       );
     }
 
-
     const { searchParams } = new URL(req.url);
-    const category = searchParams.get('category');
-    const status = searchParams.get('status');
+    const category = searchParams.get("category");
+    const status = searchParams.get("status");
 
     let query = {};
-    if (category && category !== 'all') query.category = category;
-    if (status && status !== 'all') query.status = status;
+    if (category && category !== "all") query.category = category;
+    if (status && status !== "all") query.status = status;
 
     const expenses = await Expense.find(query)
-      .populate('addedBy', 'userName email')
+      .populate("addedBy", "userName email")
       .sort({ date: -1 })
       .lean();
 
-
     // Calculate totals
-    const paidExpenses = await Expense.find({ status: 'paid' }).lean();
+    const paidExpenses = await Expense.find({ status: "paid" }).lean();
     const totalAmount = paidExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
     // Calculate by category
     const byCategory = {};
-    paidExpenses.forEach(exp => {
+    paidExpenses.forEach((exp) => {
       if (!byCategory[exp.category]) {
         byCategory[exp.category] = {
           _id: exp.category,
@@ -76,7 +74,9 @@ export async function GET(req) {
       byCategory[exp.category].count += 1;
     });
 
-    const byCategoryArray = Object.values(byCategory).sort((a, b) => b.total - a.total);
+    const byCategoryArray = Object.values(byCategory).sort(
+      (a, b) => b.total - a.total,
+    );
 
     return NextResponse.json({
       success: true,
@@ -88,14 +88,14 @@ export async function GET(req) {
       byCategory: byCategoryArray,
     });
   } catch (error) {
-    console.error('❌ Error fetching expenses:', error);
+    console.error("❌ Error fetching expenses:", error);
     return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Server error', 
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      {
+        success: false,
+        message: "Server error",
+        error: isTestMode() ? error.message : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -104,15 +104,15 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     await dbConnect();
-    
+
     // Get token from cookies
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    
+    const token = cookieStore.get("token")?.value;
+
     if (!token) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
 
@@ -120,29 +120,37 @@ export async function POST(req) {
     const decoded = verifyToken(token);
     if (!decoded) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
-
 
     // Check if user is admin
     const user = await User.findById(decoded.id);
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== "admin") {
       return NextResponse.json(
-        { success: false, message: 'Access denied. Admin only.' },
-        { status: 403 }
+        { success: false, message: "Access denied. Admin only." },
+        { status: 403 },
       );
     }
 
-
     const body = await req.json();
-    const { title, description, amount, category, date, paymentMethod, receipt, notes, status } = body;
+    const {
+      title,
+      description,
+      amount,
+      category,
+      date,
+      paymentMethod,
+      receipt,
+      notes,
+      status,
+    } = body;
 
     if (!title || !amount || !category) {
       return NextResponse.json(
-        { success: false, message: 'Title, amount, and category are required' },
-        { status: 400 }
+        { success: false, message: "Title, amount, and category are required" },
+        { status: 400 },
       );
     }
 
@@ -152,31 +160,30 @@ export async function POST(req) {
       amount: parseFloat(amount),
       category,
       date: date ? new Date(date) : new Date(),
-      paymentMethod: paymentMethod || 'bank_transfer',
+      paymentMethod: paymentMethod || "bank_transfer",
       receipt,
       notes,
-      status: status || 'paid',
+      status: status || "paid",
       addedBy: decoded.id,
     });
 
     await expense.save();
-    await expense.populate('addedBy', 'userName email');
-
+    await expense.populate("addedBy", "userName email");
 
     return NextResponse.json({
       success: true,
-      message: 'Expense added successfully',
+      message: "Expense added successfully",
       expense,
     });
   } catch (error) {
-    console.error('❌ Error adding expense:', error);
+    console.error("❌ Error adding expense:", error);
     return NextResponse.json(
-      { 
-        success: false, 
-        message: 'Server error', 
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      {
+        success: false,
+        message: "Server error",
+        error: isTestMode() ? error.message : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -185,40 +192,40 @@ export async function POST(req) {
 export async function DELETE(req) {
   try {
     await dbConnect();
-    
+
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    
+    const token = cookieStore.get("token")?.value;
+
     if (!token) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
 
     const decoded = verifyToken(token);
     if (!decoded) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
       );
     }
 
     const user = await User.findById(decoded.id);
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== "admin") {
       return NextResponse.json(
-        { success: false, message: 'Access denied' },
-        { status: 403 }
+        { success: false, message: "Access denied" },
+        { status: 403 },
       );
     }
 
     const { searchParams } = new URL(req.url);
-    const expenseId = searchParams.get('id');
+    const expenseId = searchParams.get("id");
 
     if (!expenseId) {
       return NextResponse.json(
-        { success: false, message: 'Expense ID required' },
-        { status: 400 }
+        { success: false, message: "Expense ID required" },
+        { status: 400 },
       );
     }
 
@@ -226,21 +233,20 @@ export async function DELETE(req) {
 
     if (!expense) {
       return NextResponse.json(
-        { success: false, message: 'Expense not found' },
-        { status: 404 }
+        { success: false, message: "Expense not found" },
+        { status: 404 },
       );
     }
 
-
     return NextResponse.json({
       success: true,
-      message: 'Expense deleted successfully',
+      message: "Expense deleted successfully",
     });
   } catch (error) {
-    console.error('❌ Error deleting expense:', error);
+    console.error("❌ Error deleting expense:", error);
     return NextResponse.json(
-      { success: false, message: 'Server error' },
-      { status: 500 }
+      { success: false, message: "Server error" },
+      { status: 500 },
     );
   }
 }
